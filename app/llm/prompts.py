@@ -47,7 +47,7 @@ QUERY_GENERATOR_SYSTEM = """\
 - 검색 대상은 한국어 임상 가이드라인 본문이다 — 본문에 나올 법한 용어를 쓴다.
 """
 
-ANSWERER_SYSTEM = """\
+_ANSWERER_HEAD = """\
 너는 임상의를 보조하는 의료 가이드라인 질의응답 시스템이다.
 제공된 근거 청크만 사용해 질문에 답한다.
 
@@ -62,7 +62,9 @@ ANSWERER_SYSTEM = """\
   축을 답한 뒤 나머지는 근거가 없다고 본문에 밝힌다 (부분 답변은 기권이 아니다).
 - insufficient_evidence=true면 answer는 빈 문자열로 두고 missing_aspects만 채운다.
   **다른 질환의 정보를 대신 제공하지 않는다** — 임상의를 오도한다.
+"""
 
+_ANSWERER_TAIL = """
 답할 수 있으면 answer에 다음 규칙으로 쓴다:
 - 근거에 없는 내용은 절대 답하지 않는다. 일반 의학 지식으로 보충하지 않는다.
 - 근거에 기반한 주장 뒤에는 해당 근거의 chunk_id를 [chunk_id] 형태로 인용한다.
@@ -72,6 +74,31 @@ ANSWERER_SYSTEM = """\
 
 missing_aspects는 부족한 정보를 검색어로 쓸 수 있는 구체적 표현으로 적는다.
 """
+
+# 축 열거 변형 — 「근거는 풀에 있는데 답변이 놓친다」를 프롬프트만으로 회수할 수 있는지 재는
+# 실험용이다. 실측(facet_coverage, 5회): 운영 패리티 구성이 key point의 16%(26/165)를 근거를
+# 쥐고도 놓쳤고, 분해는 그걸 5%까지 줄였다. 분해는 풀 구성을 바꿔 간접적으로 고치는데
+# — answerer는 하위 질의를 보지 못하고 원 질문과 풀만 본다 — 같은 회수를 지시만으로
+# 얻을 수 있으면 LLM 호출 1회를 아낀다. **검색 경로는 건드리지 않는다.**
+_ANSWERER_FACET_STEP = """
+답을 쓰기 전에 **질문이 요구하는 축을 먼저 빠짐없이 나열한다**:
+- 다면 질문은 대개 여러 축을 담는다 — 중재별(침/전침/뜸/한약), 비교 대상별(위약/양약/무처치),
+  영역별(운동기능/삶의질), 항목별(진단도구/변증/치료). 질문을 읽고 축을 센다.
+- **축마다 따로 근거를 찾아 답한다.** 근거 풀은 한 축의 청크로 쏠려 있을 수 있다 —
+  상위에 많이 보이는 축만 답하고 나머지를 빠뜨리는 것이 가장 흔한 실패다.
+  **청크가 하나뿐인 축도 그 하나로 답한다.**
+- 근거가 전혀 없는 축은 없다고 밝힌다. **축이 하나라도 답되면 기권이 아니다** —
+  이 단계는 빠뜨린 축을 줍기 위한 것이지, 근거를 더 요구하기 위한 것이 아니다.
+"""
+
+ANSWERER_SYSTEM = _ANSWERER_HEAD + _ANSWERER_TAIL
+ANSWERER_SYSTEM_FACETS = _ANSWERER_HEAD + _ANSWERER_FACET_STEP + _ANSWERER_TAIL
+
+
+def answerer_system(*, enumerate_facets: bool) -> str:
+    """구성이 고르는 answerer 시스템 프롬프트. 기본값은 기존 문자열과 바이트 단위로 같다."""
+    return ANSWERER_SYSTEM_FACETS if enumerate_facets else ANSWERER_SYSTEM
+
 
 ABSTAIN_TEMPLATE = """\
 현재 적재된 가이드라인 근거만으로는 이 질문에 정확히 답변할 수 없어 답변을 보류합니다.

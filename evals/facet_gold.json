@@ -1,0 +1,280 @@
+{
+  "cpx-001": {
+    "question": "퇴행성 슬관절염 환자에서 침 치료 단독의 효과 근거와 통상적(의과) 치료에 침 치료를 병행하는 것의 권고 내용, 그리고 전침 치료의 근거를 각각 설명하라.",
+    "key_points": [
+      "침 치료가 통상 치료보다 통증·기능·삶의 질 개선 (R2)",
+      "통상 치료에 침 병행 고려해야 함 (R3, 중등도 권고)",
+      "전침은 거짓침·비활성 대조군보다 유의한 개선 (R5)"
+    ],
+    "gold": [
+      [
+        "01KYQEXNPRH5QYB1Z4N40JBWKX",
+        "01KYQEXNPRWRZHHD4PKAHMFVFP",
+        "01KYQEXNQC4TY9EMTGFK19FKHT"
+      ],
+      [
+        "01KYQEXNPSKP3XT8GA129HPY40",
+        "01KYQEXNPSS9P41GH3X7R3EWY2"
+      ],
+      [
+        "01KYQEXNPT2W4KQM648NRRKK31",
+        "01KYQEXNPTN7BHCATEGVXKDQ6Y",
+        "01KYQEXNPV6K0YD9BW2XX1SJ9G"
+      ]
+    ],
+    "candidates": 25
+  },
+  "cpx-002": {
+    "question": "성인 고혈압 환자에서 천마구등음 단독투여와 항고혈압제 병행투여의 권고 등급 차이와 각각의 적응 변증을 설명하라.",
+    "key_points": [
+      "단독투여는 약한 권고 (R1-1)",
+      "항고혈압제와 병행투여는 중등도 권고 (R4)",
+      "천마구등음은 간양상항 변증에 활용"
+    ],
+    "gold": [
+      [
+        "01KYQESTCHNWW21026CMT9FAZE"
+      ],
+      [
+        "01KYQESTCJ4WXVS4GT9QS1HQH0",
+        "01KYQESTCK5Y6H05EAR4V8880Q",
+        "01KYQESTCK78NHBR4Y37087ZHQ",
+        "01KYQESTCKCBHFYT9JS8BQQ15E"
+      ],
+      [
+        "01KYQESTCHCHH3E7K6E4EWM2V5"
+      ]
+    ],
+    "candidates": 27
+  },
+  "cpx-003": {
+    "question": "중풍 환자에서 침 치료 병행이 개선시키는 영역들과 각 영역별 권고 강도를 정리하라.",
+    "key_points": [
+      "신경학적 장애 개선 — 약한 권고 (R2)",
+      "전반적 증상 개선 — 중등도 권고 (R3)",
+      "일상생활 수행능력·운동장애 개선 — 중등도 권고 (R4, R5)"
+    ],
+    "gold": [
+      [
+        "01KYQ8XFP5E847PTP3RW3E9XWG",
+        "01KYQ8XFP5R4JWYCJQVCDME0GB",
+        "01KYQ8XFPJ3S3HM5WT39NVGNDF"
+      ],
+      [
+        "01KYQ8XFP683EC78W2PJS39GCK",
+        "01KYQ8XFP7N5VYBQKD7DRM2ZSF",
+        "01KYQ8XFPJVT44YTMXT5A3PVCD"
+      ],
+      [
+        "01KYQ8XFP7K0ANYNX0M5F4RV2M",
+        "01KYQ8XFP8D5PKMXK70F5CSFY9",
+        "01KYQ8XFP8PCGBF1V00CTGBRX5",
+        "01KYQ8XFPJDV5P39DZV0VJYB08",
+        "01KYQ8XFPK85610F5DQ00C4WBQ",
+        "01KYQ8XFPKGM289S5CF659YZC6",
+        "01KYQ8XFPKHHBMS6HKC567WGTF",
+        "01KYQ8XFPKSZ6ERVN66Q2M7Z4S"
+      ]
+    ],
+    "candidates": 29
+  },
+  "cpx-004": {
+    "question": "ADHD 소아·청소년 환자에서 한약, 침, 뜸 치료 각각의 권고 유형(근거 기반 vs 전문가 합의)과 등급을 비교하라.",
+    "key_points": [
+      "한약 — 약한 권고, 근거수준 매우 낮음 (R1)",
+      "침 — 약한 권고, 근거수준 매우 낮음 (R2)",
+      "뜸 — 전문가 합의 권고 (R3)"
+    ],
+    "gold": [
+      [
+        "01KYSD2FTBF9JJH7GXTWSQCZZ7",
+        "01KYSD2FTDESY6SV8JP8180FMS"
+      ],
+      [
+        "01KYSD2FTC0041SB6NS9WCRR9N",
+        "01KYSD2FTDESY6SV8JP8180FMS"
+      ],
+      [
+        "01KYSD2FTDYX8226GS098KKNGP",
+        "01KYSD2FTED26Y64JQFM3WYWW6"
+      ]
+    ],
+    "candidates": 31
+  },
+  "cpx-005": {
+    "question": "원발성 월경통 환자에서 침치료는 무처치 및 플라시보 침과 비교해 각각 어떻게 권고되며, 주로 사용되는 경혈은 무엇인가?",
+    "key_points": [
+      "무처치 대비 침치료 고려해야 함 (R1-1, 중등도 권고)",
+      "플라시보 침 대비 침치료 고려해야 함 (R1-3, 중등도 권고)",
+      "경혈 예: 삼음교 등"
+    ],
+    "gold": [
+      [
+        "01KYSD96RG9YVVX6ENY940ASK0",
+        "01KYSD96RGNC1NR55V7736ABWG"
+      ],
+      [
+        "01KYSD96RHAMZKJ4R544X4G0C2"
+      ],
+      [
+        "01KYSD96RGNC1NR55V7736ABWG",
+        "01KYSD96RHAMZKJ4R544X4G0C2"
+      ]
+    ],
+    "candidates": 19
+  },
+  "cpx-006": {
+    "question": "성인 원발성 불면 환자에서 귀비탕가감, 온담탕가감, 산조인탕가감의 변증별 선택 기준을 비교하라.",
+    "key_points": [
+      "귀비탕 — 심비를 상해 건망·정충 (R1-1-1)",
+      "온담탕 — 잘 놀라고 꿈·수면이 불안정 (R1-2-1)",
+      "산조인탕 — 불면 또는 과다수면 (R1-3-1)"
+    ],
+    "gold": [
+      [
+        "01KYQ8VMSZ54G4A3GJ82ZQSSTT"
+      ],
+      [
+        "01KYQ8VMT0MHWS0DQZEEZ5537T"
+      ],
+      [
+        "01KYQ8VMT1FVZQY5PNENS9M4H0"
+      ]
+    ],
+    "candidates": 23
+  },
+  "cpx-007": {
+    "question": "과민대장증후군 환자에서 한약 치료는 위약 및 통상적 양방 약물 치료와 비교해 각각 어떻게 권고되며, 곽향정기산의 권고 근거는 무엇인가?",
+    "key_points": [
+      "위약 대비 한약 고려 가능 (R1, 약한 권고)",
+      "양방약물 대비 한약 고려 가능 (R2, 약한 권고)",
+      "곽향정기산은 전문가 합의에 근거해 권고 (R2-1)"
+    ],
+    "gold": [
+      [
+        "01KYQ8P21870D90G5F3A1A63FY",
+        "01KYQ8P218CKNT763279VJHJZ2"
+      ],
+      [
+        "01KYQ8P219P3N2NQMRDJ9PT2W9",
+        "01KYQ8P21FS927FE2ZY7M85FRY",
+        "01KYQ8P21GE1JJS8T4MKRVT4ZJ",
+        "01KYQ8P21GNBBD260WRKPKW3HS"
+      ],
+      [
+        "01KYQ8P21BAC5AZG88W73KSP8A",
+        "01KYQ8P21BS6R9KZNDYAFAA13H"
+      ]
+    ],
+    "candidates": 25
+  },
+  "cpx-008": {
+    "question": "성인 대상포진 환자에서 침, 전침, 화침, 뜸 치료의 권고 등급과 근거수준을 비교하라.",
+    "key_points": [
+      "침·전침·뜸 — 약한 권고, 근거수준 낮음 (R1, R2, R4)",
+      "화침 — 약한 권고, 근거수준 매우 낮음 (R3)"
+    ],
+    "gold": [
+      [
+        "01KYQEGAY3C7BS632BS78YWH35"
+      ],
+      [
+        "01KYQEGAXWG7QCYKNHTT2HJSAT"
+      ]
+    ],
+    "candidates": 30
+  },
+  "cpx-009": {
+    "question": "소아식욕부진 진료에서 권고되는 진단 도구와 적용 연령, 변증 진단 방법, 그리고 한약치료의 권고 내용을 정리하라.",
+    "key_points": [
+      "K-CEBQ를 2-9세 소아에 적용 고려 (R1)",
+      "변증별 필수 증상 확인을 통한 변증 진단 (R2, 위기허증·위음허증 등)",
+      "경과관찰보다 한약치료 고려해야 함 (R3-1, 중등도 권고)"
+    ],
+    "gold": [
+      [
+        "01KYQEEXFX7NMZV7AXHV4SR0XF"
+      ],
+      [
+        "01KYQEEXFX5BDGXTGGEAEZZJTA"
+      ],
+      [
+        "01KYQEEXFY70T9DWJ91P2RTRXA",
+        "01KYQEEXFYA82FHMC6PTS5BF7B"
+      ]
+    ],
+    "candidates": 30
+  },
+  "cpx-010": {
+    "question": "성인 견비통 환자의 침치료에서 취혈 전략(근위/원위)과 물리치료 병행에 대한 권고를 함께 설명하라.",
+    "key_points": [
+      "근위·원위부 동시 취혈 고려, 하지 원위부 경혈 포함 (R5)",
+      "일반침과 물리치료 병행 권고 (R4, 강한 권고)",
+      "물리치료·소염진통제 복합치료보다 일반침 고려 (R2)"
+    ],
+    "gold": [
+      [
+        "01KYQF1CE75T7R8NCB2QXZJ8BA",
+        "01KYQF1CE7FVQAWQ0T7RBM40FW",
+        "01KYQF1CE82592EYW3KPNT2P6G",
+        "01KYQF1CE8VBXFZR4YAK5K4EXF"
+      ],
+      [
+        "01KYQF1CE7DSQE8FKAR8P64FPV",
+        "01KYQF1CE7XNYTZV3Q1GRRSWX6",
+        "01KYQF1CE7YEMAVPQRVZXJP7Z3"
+      ],
+      [
+        "01KYQF1CE6JY2ZXZ79KMFZNJ33",
+        "01KYQF1CE6MX0KPP32F84218SN",
+        "01KYQF1CE7GT8TW8RZ3WKJ89TQ"
+      ]
+    ],
+    "candidates": 23
+  },
+  "cpx-011": {
+    "question": "만성 요통과 퇴행성 슬관절염 환자에서 전침 치료의 권고 내용을 각각 확인하고 비교하라.",
+    "key_points": [
+      "만성요통 — 전침이 활성대조군·무처치 대비 개선, 중등도 권고 (R8)",
+      "슬관절염 — 전침이 거짓침·비활성 대조군 대비 개선 (R5)"
+    ],
+    "gold": [
+      [
+        "01KYQEZ11V3QXW1HS4F9XV7Z65"
+      ],
+      [
+        "01KYQEXNPT2W4KQM648NRRKK31",
+        "01KYQEXNPTN7BHCATEGVXKDQ6Y"
+      ]
+    ],
+    "candidates": 19
+  },
+  "cpx-012": {
+    "question": "성인 주요우울장애 환자에서 항우울제 대비 한약 치료의 권고와, 한약 단독치료 시 유의사항을 설명하라.",
+    "key_points": [
+      "항우울제 대비 한약 고려 가능 (R1, 약한 권고)",
+      "한약 단독치료 시 임상적 고려사항 존재 (증상 악화 모니터링 등)"
+    ],
+    "gold": [
+      [
+        "01KYQ8FA6SWN30DB4976JC7JHT"
+      ],
+      [
+        "01KYQ8FA6SWN30DB4976JC7JHT"
+      ]
+    ],
+    "candidates": 34
+  },
+  "_meta": {
+    "runs": [
+      "results/rep1",
+      "results/rep2",
+      "results/rep3",
+      "results/rep4",
+      "results/rep5"
+    ],
+    "dataset": "evals/dataset.jsonl",
+    "excerpt": 900,
+    "model": "openai:gpt-4.1-mini"
+  }
+}

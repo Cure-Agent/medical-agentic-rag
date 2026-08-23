@@ -6,7 +6,7 @@ from langchain_core.language_models import BaseChatModel
 
 from app.agent.state import AgentAnswer, AgentState, AnswererOutput, Citation, trace_event
 from app.config import Settings
-from app.llm.prompts import ABSTAIN_TEMPLATE, ANSWERER_SYSTEM, format_evidence_block
+from app.llm.prompts import ABSTAIN_TEMPLATE, answerer_system, format_evidence_block
 from app.retrieval.base import Evidence
 
 
@@ -29,7 +29,7 @@ def _citations_in(text: str, evidence: dict[str, Evidence]) -> list[Citation]:
     ]
 
 
-def make_answer_node(llm: BaseChatModel, settings: Settings):
+def make_answer_node(llm: BaseChatModel, settings: Settings, *, enumerate_facets: bool = False):
     """생성 단계 안전 게이트를 겸한다.
 
     검색 게이트는 관련도만 재므로 인접 주제(군발두통↔편두통)를 통과시킨다 — 실측에서
@@ -40,6 +40,7 @@ def make_answer_node(llm: BaseChatModel, settings: Settings):
     거부하면서 다른 질환 정보를 곁들이던 실측 사례(ins-008)가 출력되지 않는다.
     """
     structured = llm.with_structured_output(AnswererOutput)
+    system = answerer_system(enumerate_facets=enumerate_facets)
 
     async def answer(state: AgentState) -> dict:
         best = sorted(state["evidence"].values(), key=lambda e: e.distance)
@@ -52,9 +53,7 @@ def make_answer_node(llm: BaseChatModel, settings: Settings):
             for e in best
         )
         user = f"## 질문\n{state['question']}\n\n## 근거 청크\n{pool}"
-        output: AnswererOutput = await structured.ainvoke(
-            [("system", ANSWERER_SYSTEM), ("user", user)]
-        )
+        output: AnswererOutput = await structured.ainvoke([("system", system), ("user", user)])
 
         # 빈 답변은 플래그와 무관하게 기권이다 — 모델이 플래그를 빠뜨려도 빈 본문은 못 낸다.
         # 발화 원인을 구분해 남긴다: 과잉 기권을 조사할 때 「모델이 판단해서 기권」과

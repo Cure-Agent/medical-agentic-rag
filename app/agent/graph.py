@@ -38,6 +38,10 @@ class AgentConfig:
     rerank_score_cutoff: float = 3.5
     # answerer가 받는 근거 수. 질의당 상한이므로 분해 구성에서는 질의 수만큼 곱해진다
     top_k: int = 5
+    # True면 answerer가 질문의 축을 먼저 열거하고 축마다 답한다. **검색 경로는 그대로다** —
+    # 「근거는 풀에 있는데 답변이 놓친다」(실측 26/165)를 프롬프트만으로 회수할 수 있는지
+    # 재는 축이라, 이 플래그와 검색 변경을 같은 구성에 섞으면 원인이 갈리지 않는다.
+    enumerate_facets: bool = False
 
 
 PRESETS: dict[str, AgentConfig] = {
@@ -73,6 +77,11 @@ PRESETS: dict[str, AgentConfig] = {
         top_k=11,
     ),
 }
+
+# 축 열거 실험(3차) — `rerank`(운영 재현)에서 **answerer 프롬프트만** 바꾼 짝이다.
+# 분해와 달리 검색 경로·LLM 호출 수가 통제군과 완전히 같아, 차이가 나면 원인이 프롬프트 하나로
+# 특정된다. 통제군은 `rerank` 자신이다.
+PRESETS["rerank_facets"] = replace(PRESETS["rerank"], enumerate_facets=True)
 
 # 2차 실험에서 쓴 공격적 컷 — v1 결과 재현·비교용으로 남긴다
 LEGACY_RERANK_CUTOFF = 9.0

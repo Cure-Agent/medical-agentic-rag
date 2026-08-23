@@ -20,7 +20,7 @@ def make_default_nodes(
             make_decompose_node(llm) if cfg.enable_decomposition else make_passthrough_decompose()
         ),
         retrieve=make_retrieve_node(retriever),
-        answer=make_answer_node(llm, settings),
+        answer=make_answer_node(llm, settings, enumerate_facets=cfg.enumerate_facets),
         abstain=make_abstain_node(),
         evaluate=make_evaluate_node(llm, settings) if cfg.enable_evaluator else None,
         generate_queries=make_generate_queries_node(llm) if cfg.enable_evaluator else None,
