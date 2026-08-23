@@ -88,18 +88,18 @@
     "gold": [
       [
         "01KYSD2FTBF9JJH7GXTWSQCZZ7",
-        "01KYSD2FTDESY6SV8JP8180FMS"
+        "01KYSD2FTENQKVR7TZBB1QTYFS"
       ],
       [
-        "01KYSD2FTC0041SB6NS9WCRR9N",
-        "01KYSD2FTDESY6SV8JP8180FMS"
+        "01KYSD2FTDESY6SV8JP8180FMS",
+        "01KYSD2FTW9P9V05XFGE1S9PCC"
       ],
       [
         "01KYSD2FTDYX8226GS098KKNGP",
         "01KYSD2FTED26Y64JQFM3WYWW6"
       ]
     ],
-    "candidates": 31
+    "candidates": 32
   },
   "cpx-005": {
     "question": "원발성 월경통 환자에서 침치료는 무처치 및 플라시보 침과 비교해 각각 어떻게 권고되며, 주로 사용되는 경혈은 무엇인가?",
@@ -111,14 +111,26 @@
     "gold": [
       [
         "01KYSD96RG9YVVX6ENY940ASK0",
-        "01KYSD96RGNC1NR55V7736ABWG"
+        "01KYSD96RGNC1NR55V7736ABWG",
+        "01KYSD96RKZNVKVBNBN5ESECQP"
       ],
       [
-        "01KYSD96RHAMZKJ4R544X4G0C2"
+        "01KYSD96RHAMZKJ4R544X4G0C2",
+        "01KYSD96RHK2BG67W2DBB7VRAC",
+        "01KYSD96RHRJSVEBV8P7RV918K",
+        "01KYSD96RK1VVF73DZE3GFF6HN",
+        "01KYSD96RKWMDB0KMCMP3PW8SW"
       ],
       [
         "01KYSD96RGNC1NR55V7736ABWG",
-        "01KYSD96RHAMZKJ4R544X4G0C2"
+        "01KYSD96RHAMZKJ4R544X4G0C2",
+        "01KYSD96RHBFEC58MZRP8S50ZB",
+        "01KYSD96RHK2BG67W2DBB7VRAC",
+        "01KYSD96RJMCANAANX70PPM8CV",
+        "01KYSD96RK1AW9CZMBPVN10FTF",
+        "01KYSD96RK1VVF73DZE3GFF6HN",
+        "01KYSD96RKWMDB0KMCMP3PW8SW",
+        "01KYSD96RKZNVKVBNBN5ESECQP"
       ]
     ],
     "candidates": 19
@@ -138,7 +150,8 @@
         "01KYQ8VMT0MHWS0DQZEEZ5537T"
       ],
       [
-        "01KYQ8VMT1FVZQY5PNENS9M4H0"
+        "01KYQ8VMT1FVZQY5PNENS9M4H0",
+        "01KYQ8VMT2B38WW9GD818Z0PEA"
       ]
     ],
     "candidates": 23
@@ -157,9 +170,13 @@
       ],
       [
         "01KYQ8P219P3N2NQMRDJ9PT2W9",
+        "01KYQ8P21BAC5AZG88W73KSP8A",
         "01KYQ8P21FS927FE2ZY7M85FRY",
         "01KYQ8P21GE1JJS8T4MKRVT4ZJ",
-        "01KYQ8P21GNBBD260WRKPKW3HS"
+        "01KYQ8P21GNBBD260WRKPKW3HS",
+        "01KYQ8P21HHB3AGN0TJJS7D2DV",
+        "01KYQ8P21HNWMZ1XMMHVW0M7RN",
+        "01KYQ8P21HYB6FVM8JQS29ME02"
       ],
       [
         "01KYQ8P21BAC5AZG88W73KSP8A",
@@ -176,13 +193,15 @@
     ],
     "gold": [
       [
+        "01KYQEGAXXR6HY2KN779PK6Y0J",
         "01KYQEGAY3C7BS632BS78YWH35"
       ],
       [
-        "01KYQEGAXWG7QCYKNHTT2HJSAT"
+        "01KYQEGAXWG7QCYKNHTT2HJSAT",
+        "01KYQEGAYEWC17NK731P6R2MJD"
       ]
     ],
-    "candidates": 30
+    "candidates": 31
   },
   "cpx-009": {
     "question": "소아식욕부진 진료에서 권고되는 진단 도구와 적용 연령, 변증 진단 방법, 그리고 한약치료의 권고 내용을 정리하라.",
@@ -267,6 +286,11 @@
   },
   "_meta": {
     "runs": [
+      "results/facet1",
+      "results/facet2",
+      "results/facet3",
+      "results/facet4",
+      "results/facet5",
       "results/rep1",
       "results/rep2",
       "results/rep3",

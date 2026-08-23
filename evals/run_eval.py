@@ -9,6 +9,7 @@
 import argparse
 import asyncio
 import json
+import subprocess
 from pathlib import Path
 
 from psycopg.rows import dict_row
@@ -27,6 +28,29 @@ CONCURRENCY = 2
 RERANK_CONCURRENCY = 1
 
 
+def code_version() -> str:
+    """실행 시점의 커밋 해시. **결과 행에 박는다.**
+
+    `policy_version`은 검색 정책만 담고 프롬프트·노드 코드는 담지 못한다. 2026-08-23에
+    그 공백이 실제로 문제가 됐다 — 통제군과 분해 구성이 2시간 반 간격으로 돌았고 그 사이
+    프롬프트와 검색 계층이 수정됐는데, 커밋이 없어 파일 mtime과 trace 지문(`flag` 키의
+    유무)으로 역추적해야 했다. 그 비교는 결국 폐기됐다.
+
+    작업 트리가 더러우면 `+dirty`를 붙인다 — 해시만으로는 재현되지 않는다는 표시다.
+    git이 없거나 커밋이 없으면 "unknown"이며, 실행을 막지는 않는다.
+    """
+    try:
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return "unknown"
+    return f"{head}+dirty" if dirty else head
+
+
 def load_dataset(path: Path) -> list[dict]:
     rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
     for row in rows:
@@ -34,7 +58,9 @@ def load_dataset(path: Path) -> list[dict]:
     return rows
 
 
-async def run_one(agent, item: dict, preset: str, policy_version: str, sem: asyncio.Semaphore):
+async def run_one(
+    agent, item: dict, preset: str, policy_version: str, code: str, sem: asyncio.Semaphore
+):
     async with sem:
         try:
             final = await agent.ainvoke(initial_state(item["question"]))
@@ -42,6 +68,7 @@ async def run_one(agent, item: dict, preset: str, policy_version: str, sem: asyn
             return {
                 "preset": preset,
                 "policy_version": policy_version,
+                "code_version": code,
                 "id": item["id"],
                 "category": item["category"],
                 "question": item["question"],
@@ -58,6 +85,7 @@ async def run_one(agent, item: dict, preset: str, policy_version: str, sem: asyn
         except Exception as error:  # 한 문항의 실패가 전체 실행을 죽이면 안 된다
             return {
                 "preset": preset,
+                "code_version": code,
                 "id": item["id"],
                 "category": item["category"],
                 "kind": "error",
@@ -65,7 +93,7 @@ async def run_one(agent, item: dict, preset: str, policy_version: str, sem: asyn
             }
 
 
-async def run_preset(preset: str, dataset: list[dict], out_dir: Path) -> None:
+async def run_preset(preset: str, dataset: list[dict], out_dir: Path, code: str) -> None:
     settings = get_settings()
     cfg = PRESETS[preset]
     pool = AsyncConnectionPool(settings.database_url, open=False, kwargs={"row_factory": dict_row})
@@ -87,7 +115,7 @@ async def run_preset(preset: str, dataset: list[dict], out_dir: Path) -> None:
 
         sem = asyncio.Semaphore(RERANK_CONCURRENCY if cfg.enable_rerank else CONCURRENCY)
         rows = await asyncio.gather(
-            *(run_one(agent, item, preset, policy, sem) for item in dataset)
+            *(run_one(agent, item, preset, policy, code, sem) for item in dataset)
         )
 
         out_path = out_dir / f"{preset}.jsonl"
@@ -123,10 +151,12 @@ async def main() -> None:
         dataset = [row for row in dataset if row["category"] in wanted]
         assert dataset, f"카테고리 필터가 전부 걸러냈다: {args.categories}"
     args.out.mkdir(parents=True, exist_ok=True)
+    code = code_version()
+    print(f"[code] {code}")
     for preset in args.presets.split(","):
         preset = preset.strip()
         assert preset in PRESETS, f"unknown preset: {preset}"
-        await run_preset(preset, dataset, args.out)
+        await run_preset(preset, dataset, args.out, code)
 
 
 if __name__ == "__main__":
