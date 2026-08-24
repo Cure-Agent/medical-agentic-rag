@@ -1,7 +1,7 @@
 # medical-agentic-rag
 
 의료 가이드라인 코퍼스 위에서 **Agentic RAG가 실제로 언제 도움이 되는가**를 측정하는 실험 프로젝트.
-운영 중인 의료 RAG 서비스([cure-agent](../cure-agent-be))의 하이브리드 검색을 Base Retriever로 이식하고,
+운영 중인 의료 RAG 서비스([cure-agent-be](https://github.com/Cure-Agent/cure-agent-be))의 하이브리드 검색을 Base Retriever로 이식하고,
 그 위에 query decomposition + iterative retrieval 루프를 얹어 ablation으로 비교한다.
 
 ## 문제의식
