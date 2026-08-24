@@ -78,6 +78,19 @@ PRESETS: dict[str, AgentConfig] = {
     ),
 }
 
+# 반복 검색 루프 실험(4차) — `rerank`(운영 재현)에 **충분성 루프만** 얹은 짝이다.
+# 통제군은 `rerank` 자신이고, 분해는 켜지 않는다 — 분해는 이미 기각됐으므로(2026-08-24)
+# 여기서 재는 것은 「원 질문 1개로 검색한 뒤, 부족하면 질의를 새로 만들어 다시 검색하는 것이
+# 운영 패리티 위에서 이득인가」 하나다.
+#
+# **주의: 이 구성에는 리랭크 점수 게이트가 없다.** enable_evaluator=True면 `build_graph`가
+# `route_after_evaluate`만 배선하고 `route_gate`를 지나지 않는다 — 기권 판정이 점수 게이트에서
+# evaluator 판정 + 재검색 예산으로 넘어간다. 따라서 `rerank`와의 차이는 「루프」 단독이 아니라
+# **「루프 + 점수 게이트 제거」의 합**이고, 결과 문서에 그렇게 적어야 원인이 갈린다.
+#
+# v1의 `full`은 리랭커 없는 축에서 k=1로 잰 것이라 이 축의 근거가 못 된다(그 표는 폐기됨).
+PRESETS["rerank_full"] = replace(PRESETS["rerank"], enable_evaluator=True, max_retrieval=2)
+
 # 축 열거 실험(3차) — `rerank`(운영 재현)에서 **answerer 프롬프트만** 바꾼 짝이다.
 # 분해와 달리 검색 경로·LLM 호출 수가 통제군과 완전히 같아, 차이가 나면 원인이 프롬프트 하나로
 # 특정된다. 통제군은 `rerank` 자신이다.

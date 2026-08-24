@@ -204,6 +204,72 @@ class TestPresetDefinitions:
         for name in ("rerank", "rerank_topk11", "rerank_decomp"):
             assert PRESETS[name].enable_evaluator is False
 
+    def test_루프_구성은_evaluator만_다르다(self):
+        # 통제 변인은 충분성 루프 하나여야 한다 — 분해가 같이 켜지면 원인이 안 갈린다
+        base, loop = PRESETS["rerank"], PRESETS["rerank_full"]
+        assert loop.enable_evaluator is True and base.enable_evaluator is False
+        assert loop.enable_decomposition is base.enable_decomposition is False
+        assert (loop.top_k, loop.enable_rerank, loop.fuse_before_rerank) == (
+            base.top_k,
+            base.enable_rerank,
+            base.fuse_before_rerank,
+        ), "검색 정책은 운영 재현과 같아야 한다"
+
+
+@pytest.mark.asyncio
+class TestRerankFullBypassesScoreGate:
+    """**이 구성에는 리랭크 점수 게이트가 없다** — 결과 해석이 걸린 사실이라 잠가 둔다.
+
+    `enable_evaluator=True`면 `build_graph`가 `route_after_evaluate`만 배선하고
+    `route_gate`를 지나지 않는다. 따라서 `rerank_full` 대 `rerank`의 차이는 「루프」
+    단독이 아니라 **「루프 + 점수 게이트 제거」의 합**이다. 이 테스트가 깨지는 날은
+    배선이 바뀐 날이고, 그때 실험 문서의 해석도 같이 바뀌어야 한다.
+    """
+
+    async def _run(self, preset: str, score: float, *, sufficient: bool):
+        from app.agent.graph import AgentNodes
+        from app.agent.nodes.decomposer import make_passthrough_decompose
+        from app.agent.nodes.retrieve import make_retrieve_node
+        from app.agent.state import EvaluatorVerdict
+
+        retriever = FakeRetriever(
+            {"질문": [make_evidence("c1", distance=0.10)]}, scores={"질문": score}
+        )
+        captured = {}
+
+        async def fake_answer(state):
+            captured["kind"] = "answer"
+            return {"result": None, "trace": state["trace"]}
+
+        async def fake_evaluate(state):
+            return {
+                "verdict": EvaluatorVerdict(sufficient=sufficient, per_query=[]),
+                "trace": state["trace"],
+            }
+
+        async def fake_generate(state):
+            return {"queries": [], "retrieval_count": state["retrieval_count"] + 1,
+                    "trace": state["trace"]}
+
+        nodes = AgentNodes(
+            decompose=make_passthrough_decompose(),
+            retrieve=make_retrieve_node(retriever),
+            answer=fake_answer,
+            abstain=make_abstain_node(),
+            evaluate=fake_evaluate,
+            generate_queries=fake_generate,
+        )
+        final = await build_graph(PRESETS[preset], nodes).ainvoke(initial_state("질문"))
+        return captured.get("kind", final["result"].kind if final["result"] else None)
+
+    async def test_컷_미만_점수도_evaluator가_충분하다면_답변한다(self):
+        # 같은 점수 1.0이 `rerank`에서는 기권이다 (컷 3.5)
+        assert await self._run("rerank_full", 1.0, sufficient=True) == "answer"
+
+    async def test_기권은_점수가_아니라_예산_소진이_만든다(self):
+        # 점수 10.0이어도 재검색이 매번 불충분이면 예산(max_retrieval=2)에서 기권한다
+        assert await self._run("rerank_full", 10.0, sufficient=False) == "abstain"
+
 
 @pytest.mark.asyncio
 class TestFusedRerankingRetriever:
