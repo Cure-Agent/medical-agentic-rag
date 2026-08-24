@@ -56,17 +56,19 @@
 `results/`가 gitignore이므로 숫자는 문서 본문에 박혀 있다.
 
 **현재 판정: 검색 경로는 운영 현행을 유지한다.** 제안됐던 세 개입이 모두 기각됐다
-(complex 12문항, k=5, 커밋 기록됨):
+(complex 12문항, k=5, 숫자는 [2026-08-24 교정본](docs/experiments/2026-08-24-measurement-fix.md)):
 
 | 개입 | 효과 | 판정 |
 |---|---|---|
-| query decomposition (변형 B) | +0.217, p=0.375 | 유의하지 않고, **검색 개입인데 검색층에서 차이 없음** |
+| query decomposition (변형 B) | +0.110, 부호검정 4:3 | 이질성이 커 평균에 대표성이 없고, **검색 개입인데 검색층에서 차이 없음** |
 | 근거 증량 (top-5 → top-11) | 0.000 | 재현 안 됨 — 생성층/검색층 실패를 맞바꿀 뿐 |
-| answerer 축 열거 프롬프트 | +0.033, p=0.688 | 상한 자체가 작음 |
+| answerer 축 열거 프롬프트 | **−0.083**, 부호검정 0:5 | 이득이 없고 방향이 반대일 수 있음 |
+
+**유의성은 기각 근거로 쓰지 않는다** — n=12에서 부호검정은 불일치쌍 5개가 전부 한쪽이어도
+p=0.0625다. 이 설계는 원리적으로 유의할 수 없다.
 
 이것은 「분해를 추가할 근거가 없다」이지 「현재 검색이 충분하다」가 아니다. complex 정답률은
-0.600이고 cpx-010은 모든 구성에서 5회 내내 0/5다. 다만 남은 결함이 검색층인지 생성층인지는
-**gold 라벨 누락 편향 때문에 아직 확정되지 않았다**(미해결 목록 참조).
+0.600이고 cpx-010은 모든 구성에서 5회 내내 0/5다.
 
 살아남은 결론(아직 k=1 근거): 리랭커가 단일 최대 지렛대, 두 층 기권 게이트, 점수 게이트의
 역할은 안전이 아니라 비용 절감.
@@ -87,6 +89,15 @@
 4. **통제군은 조용히 무너진다.** 근거 개수 통제군이 리랭커 요청 개수 고정 때문에 운영 재현군과
    같아진 적이 있고, 프롬프트 플래그가 노드까지 닿지 않으면 두 구성이 같은 프롬프트로 돌면서
    「차이 없음」이 나온다. 둘 다 테스트로 잠가 두었다.
+5. **측정기도 반복해야 한다.** 파이프라인은 5회 돌리면서 채점은 파일당 한 번씩 돌렸다.
+   채점을 2회 돌려 보니 노이즈는 0.6%였고, 그래서 +0.217 → +0.110을 「노이즈가 걷혔다」가
+   아니라 **「틀린 게 고쳐졌다」**로 부를 수 있게 됐다. 반복 없이는 그 둘을 못 가른다.
+6. **프롬프트에 규칙을 적는 것과 규칙이 지켜지는 것은 다르다.** 「권고등급이 명시되면 값까지
+   일치해야 한다」는 채점 규칙은 처음부터 프롬프트에 있었고 한 문항에서 10/10 위반됐다.
+   값을 **먼저 적게 하고** 비교는 코드가 해야 지켜진다(`evals/judge.py`의 `reconcile_grade`).
+7. **LLM 라벨러는 내용이 아니라 형식을 보고 고른다.** 같은 지침에서 권고안마다 「(3) 권고안
+   도출에 대한 설명 … 권고등급 …」이 반복되면 다른 권고안이 gold로 들어온다. 33개 kp 중
+   5개가 그랬다.
 
 ## 기존 시스템에서 가져온 것 (이식 근거)
 
@@ -133,12 +144,48 @@ done
 python -m evals.repeat_metrics --runs results/rep{1,2,3,4,5} --a <A> --b <B>
 ```
 
+**리랭크 점수 컷 스윕**(컷을 몇으로 둘 것인가 — 재실행 없이 사후 계산한다):
+
+```bash
+# 관심 구간의 하한 아래에서 한 번만 돌린다. 컷은 라우팅에만 쓰이므로
+# 이 실행 하나로 [0.5, ∞) 전 구간을 재구성할 수 있다.
+for i in 1 2 3 4 5; do
+  python -m evals.run_eval --presets rerank_cut05 --out results/cut$i
+  python -m evals.judge --results results/cut$i
+done
+python -m evals.cut_sweep --runs results/cut{1,2,3,4,5} --preset rerank_cut05 --run-cut 0.5
+```
+
+`--run-cut`은 그 실행이 **실제로** 돌아간 컷이다. 그보다 낮은 컷은 재구성할 수 없어
+도구가 거부한다 — 컷에 걸린 문항은 answerer를 거치지 않아 생성 게이트 판정이 비어 있고,
+그 칸을 기권으로 채우면 낮은 컷이 실제보다 안전해 보인다. 카테고리는 **전체**로 돌린다:
+컷의 손익은 insufficient(누출)와 answerable(과잉 기권) 양쪽에서 반대 방향으로 나므로
+complex만 돌리면 절반만 보게 된다.
+
 **검색층 facet coverage**(정답률이 검색/생성 어느 층의 실패인지 가른다):
 
 ```bash
 python -m evals.facet_coverage label --runs results/rep{1,2,3,4,5}   # gold 라벨 (채점할 실행 전부)
+python -m evals.facet_gold_review --runs results/rep{1,2,3,4,5}      # 검수 대상 추리기 (아래)
 python -m evals.facet_coverage score --runs results/rep{1,2,3,4,5} --a <A> --b <B>
 ```
+
+`facet_gold_review`는 LLM 라벨을 사람이 확인할 때 볼 것만 남긴다. 판정이
+`retrieved = bool(set(gold) & pool)`이라 gold 추가는 「없음」 → 「있음」 한 방향으로만
+움직이므로, **관측이 전부 「있음」인 key point는 재라벨해도 결과가 안 바뀐다.** 2026-08-24에
+33개가 11개로 줄었고, 그 11개가 두 실험의 「없음」 셀 100%를 만들었다.
+
+**채점도 반복한다**(측정기가 흔들리면 교정과 노이즈를 못 가른다):
+
+```bash
+mkdir -p results/judge2/rep1
+for f in results/rep1/*.jsonl; do
+  case "$f" in *.judged.jsonl) ;; *) cp "$f" results/judge2/rep1/;; esac   # 원 결과만 복사
+done
+python -m evals.judge --results results/judge2/rep1
+```
+
+채점 판이 바뀌면 같은 답변의 정답률이 달라진다 — 결과 행의 `judge_rules`로 판을 구분한다.
 
 리랭크 구성은 동시성 1로 내려간다 — 호출 1회가 후보 57개(~11k 토큰)라 2로 두면 429가 터진다
 (36문항 중 10건 실패 실측). complex 12문항 × 2구성 × 5회 ≈ 11분.
@@ -168,7 +215,9 @@ evals/
   metrics.py                          # preset × category 표 (1회 실행)
   repeat_metrics.py                   # k회 반복 집계 — 문항별 성공률 + 2단 부트스트랩 CI
   facet_coverage.py                   # 검색층 facet coverage + 실패 층위 교차표
-  facet_gold.json                     # key point별 지지 청크 라벨
+  facet_gold_review.py                # gold 검수 대상 추리기 — 단조성으로 33개를 11개로 좁힌다
+  cut_sweep.py                        # 리랭크 점수 컷 사후 스윕 — 실행 1회로 컷 전 구간
+  facet_gold.json                     # key point별 지지 청크 라벨 (2026-08-24 검수 반영, 사람 확인 대기)
 docs/experiments/                     # 실험 기록 (불변) — INDEX.md가 목차·현재 판정·미해결
 tests/                                # 배선·라우팅·RRF·리랭크·채점·통제조건 — 전부 오프라인
 ```

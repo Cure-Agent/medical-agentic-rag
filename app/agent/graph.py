@@ -88,6 +88,16 @@ LEGACY_RERANK_CUTOFF = 9.0
 for _name in ("rerank", "rerank_topk11", "rerank_decomp"):
     PRESETS[f"{_name}_cut9"] = replace(PRESETS[_name], rerank_score_cutoff=LEGACY_RERANK_CUTOFF)
 
+# 컷 스윕용 최저 컷 실행 — **컷을 재려는 것이 아니라 데이터를 넓히려는 구성이다.**
+# 컷은 라우팅에만 쓰이므로(`route_gate`) 컷 c로 돌린 결과에서 c 이상의 임의의 컷을
+# 사후 재구성할 수 있다(`evals/cut_sweep.py`). 거꾸로 c 미만은 재구성할 수 없다 —
+# 그 점수대 문항은 answerer를 거치지 않아 생성 게이트 판정이 비어 있다. 그래서
+# 컷 후보 전 구간을 한 번의 실행으로 덮으려면 관심 구간의 **하한 아래**에서 돌려야 한다.
+# 0.0이 아니라 0.5인 이유: 거리 게이트에 걸린 질의는 top1_relevance=0.0으로 오는데
+# (`RerankingRetriever`), 컷 0.0은 그것까지 통과시켜 운영에 없는 경로를 만든다.
+SWEEP_RERANK_CUTOFF = 0.5
+PRESETS["rerank_cut05"] = replace(PRESETS["rerank"], rerank_score_cutoff=SWEEP_RERANK_CUTOFF)
+
 
 @dataclass
 class AgentNodes:

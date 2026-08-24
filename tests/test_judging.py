@@ -7,7 +7,13 @@ import pytest
 
 from app.agent.nodes.answerer import _citations_in
 from app.agent.state import AnswererOutput
-from evals.judge import JudgeVerdict, effective_kind, judged_row
+from evals.judge import (
+    JudgeVerdict,
+    effective_kind,
+    judged_row,
+    reconcile_grade,
+    required_grade,
+)
 from evals.metrics import summarize_judged
 from tests.conftest import make_evidence
 
@@ -63,6 +69,79 @@ class TestJudgedRow:
         out = judged_row(_row("simple", "answer"), verdict)
         assert out["effective_kind"] == "answer"
         assert out["key_points_covered"] == [True, False]
+
+
+class TestRequiredGrade:
+    """key point 문구에서 요구 등급을 뽑는다. 33개 문구는 우리가 쓴 것이라 표기가 고정이다."""
+
+    def test_등급과_근거수준을_함께_명시(self):
+        assert required_grade("침·전침·뜸 — 약한 권고, 근거수준 낮음 (R1, R2, R4)") == ("C", "Low")
+
+    def test_매우_낮음이_낮음에_먹히지_않는다(self):
+        # "근거수준 낮음"이 "근거수준 매우 낮음"의 부분문자열이라 순서가 틀리면 Low로 접힌다
+        assert required_grade("한약 — 약한 권고, 근거수준 매우 낮음 (R1)") == ("C", "Very Low")
+
+    def test_등급만_명시(self):
+        assert required_grade("전반적 증상 개선 — 중등도 권고 (R3)") == ("B", None)
+        assert required_grade("일반침과 물리치료 병행 권고 (R4, 강한 권고)") == ("A", None)
+
+    def test_전문가_합의는_GPP(self):
+        assert required_grade("뜸 — 전문가 합의 권고 (R3)") == ("GPP", None)
+
+    def test_등급을_안_쓰는_key_point(self):
+        assert required_grade("K-CEBQ를 2-9세 소아에 적용 고려 (R1)") == (None, None)
+
+
+class TestReconcileGrade:
+    """등급 규칙은 코드가 강제한다 — 프롬프트만으로는 안 지켜진다(2026-08-24 실측)."""
+
+    KP = "경과관찰보다 한약치료 고려해야 함 (R3-1, 중등도 권고)"
+
+    def test_등급이_맞으면_유지(self):
+        assert reconcile_grade(self.KP, True, "B", "") is True
+
+    def test_등급이_다르면_내린다(self):
+        # 실측 회귀: 답변 10건이 R3 전체(C)를 인용했는데 R3-1(B)로 채점됐다
+        assert reconcile_grade(self.KP, True, "C", "Low") is False
+
+    def test_답변이_등급을_말하지_않으면_내린다(self):
+        assert reconcile_grade(self.KP, True, "", "") is False
+
+    def test_근거수준_불일치도_내린다(self):
+        kp = "한약 — 약한 권고, 근거수준 매우 낮음 (R1)"
+        assert reconcile_grade(kp, True, "C", "Low") is False
+        assert reconcile_grade(kp, True, "C", "Very Low") is True
+
+    def test_대소문자와_공백은_봐준다(self):
+        kp = "한약 — 약한 권고, 근거수준 매우 낮음 (R1)"
+        assert reconcile_grade(kp, True, " c ", "very low") is True
+
+    def test_등급을_안_쓰는_key_point는_그대로_통과(self):
+        assert reconcile_grade("K-CEBQ를 2-9세 소아에 적용 고려 (R1)", True, "", "") is True
+
+    def test_규칙은_내리기만_한다(self):
+        # 어떤 입력으로도 False가 True로 올라가지 않는다 — 채점이 관대해질 여지를 막는다
+        for grade in ("A", "B", "C", "GPP", ""):
+            assert reconcile_grade(self.KP, False, grade, "Moderate") is False
+
+
+class TestJudgedRowGradeRule:
+    def test_내려간_kp를_grade_overrides에_남긴다(self):
+        key_points = ["전반적 증상 개선 — 중등도 권고 (R3)", "K-CEBQ 적용 고려 (R1)"]
+        verdict = JudgeVerdict(
+            is_refusal=False,
+            key_points_covered=[True, True],
+            answer_grades=["C", ""],
+            answer_levels=["", ""],
+        )
+        out = judged_row(_row("complex", "answer"), verdict, key_points)
+        assert out["key_points_covered"] == [False, True]
+        assert out["grade_overrides"] == [0]
+        assert out["judge_rules"] == "grade-strict-v1"
+
+    def test_key_points를_안_주면_규칙을_적용하지_않는다(self):
+        verdict = JudgeVerdict(is_refusal=False, key_points_covered=[True], answer_grades=["C"])
+        assert judged_row(_row("complex", "answer"), verdict)["key_points_covered"] == [True]
 
 
 class TestSummarizeJudged:

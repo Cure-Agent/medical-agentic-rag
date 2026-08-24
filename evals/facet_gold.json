@@ -57,13 +57,11 @@
     "gold": [
       [
         "01KYQ8XFP5E847PTP3RW3E9XWG",
-        "01KYQ8XFP5R4JWYCJQVCDME0GB",
-        "01KYQ8XFPJ3S3HM5WT39NVGNDF"
+        "01KYQ8XFP5R4JWYCJQVCDME0GB"
       ],
       [
         "01KYQ8XFP683EC78W2PJS39GCK",
-        "01KYQ8XFP7N5VYBQKD7DRM2ZSF",
-        "01KYQ8XFPJVT44YTMXT5A3PVCD"
+        "01KYQ8XFP7N5VYBQKD7DRM2ZSF"
       ],
       [
         "01KYQ8XFP7K0ANYNX0M5F4RV2M",
@@ -87,12 +85,12 @@
     ],
     "gold": [
       [
-        "01KYSD2FTBF9JJH7GXTWSQCZZ7",
-        "01KYSD2FTENQKVR7TZBB1QTYFS"
+        "01KYSD2FT95H7C0HMMEPQXNY8G",
+        "01KYSD2FTBF9JJH7GXTWSQCZZ7"
       ],
       [
-        "01KYSD2FTDESY6SV8JP8180FMS",
-        "01KYSD2FTW9P9V05XFGE1S9PCC"
+        "01KYSD2FTC0041SB6NS9WCRR9N",
+        "01KYSD2FTDESY6SV8JP8180FMS"
       ],
       [
         "01KYSD2FTDYX8226GS098KKNGP",
@@ -193,12 +191,13 @@
     ],
     "gold": [
       [
-        "01KYQEGAXXR6HY2KN779PK6Y0J",
-        "01KYQEGAY3C7BS632BS78YWH35"
+        "01KYQEGAXSM3WZRAE38WR70V56",
+        "01KYQEGAXWY0XZB3AGHZ672SXJ",
+        "01KYQEGAXZDQXA21KX1NNK68DK"
       ],
       [
         "01KYQEGAXWG7QCYKNHTT2HJSAT",
-        "01KYQEGAYEWC17NK731P6R2MJD"
+        "01KYQEGAXXR6HY2KN779PK6Y0J"
       ]
     ],
     "candidates": 31
@@ -263,7 +262,8 @@
       ],
       [
         "01KYQEXNPT2W4KQM648NRRKK31",
-        "01KYQEXNPTN7BHCATEGVXKDQ6Y"
+        "01KYQEXNPTN7BHCATEGVXKDQ6Y",
+        "01KYQEXNPVW9KQEB6RXS9SV80Q"
       ]
     ],
     "candidates": 19
@@ -299,6 +299,12 @@
     ],
     "dataset": "evals/dataset.jsonl",
     "excerpt": 900,
-    "model": "openai:gpt-4.1-mini"
+    "model": "openai:gpt-4.1-mini",
+    "manual_review": {
+      "date": "2026-08-24",
+      "scope": "「없음」 관측이 하나라도 있는 11 kp (나머지 22개는 단조성으로 면제)",
+      "rule": "지지 청크는 후보 합집합 밖도 포함한다 — 검색층 실패의 절대치를 정직하게 재기 위함",
+      "tool": "evals/facet_gold_review.py"
+    }
   }
 }
