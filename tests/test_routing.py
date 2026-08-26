@@ -1,6 +1,11 @@
-"""루프 종료 결정은 순수 함수다 — LLM 없이 전 분기를 검증한다."""
+"""루프 종료 결정과 공개 API 기본 정책을 LLM 없이 검증한다."""
 
-from app.agent.graph import decide_after_evaluate, decide_gate
+from app.agent.graph import PRODUCTION_PRESET, decide_after_evaluate, decide_gate
+from app.api.routes import AskRequest
+
+
+def test_api_defaults_to_current_production_preset():
+    assert AskRequest(question="질문").preset == PRODUCTION_PRESET
 
 
 def test_sufficient_goes_to_answer():

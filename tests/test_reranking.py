@@ -194,6 +194,16 @@ class TestRerankPresetWiring:
 
 
 class TestPresetDefinitions:
+    def test_운영_프리셋은_실험_rerank에서_컷만_9로_바꾼다(self):
+        experiment, production = PRESETS["rerank"], PRESETS["prod_rerank"]
+        changed = {
+            name
+            for name in experiment.__dataclass_fields__
+            if getattr(experiment, name) != getattr(production, name)
+        }
+        assert changed == {"rerank_score_cutoff"}
+        assert production.rerank_score_cutoff == 9.0
+
     def test_통제군은_분해_없이_top_k만_다르다(self):
         base, control = PRESETS["rerank"], PRESETS["rerank_topk11"]
         assert control.enable_decomposition is base.enable_decomposition is False
@@ -213,7 +223,7 @@ class TestPresetDefinitions:
             base.top_k,
             base.enable_rerank,
             base.fuse_before_rerank,
-        ), "검색 정책은 운영 재현과 같아야 한다"
+        ), "검색 정책은 당시 통제군과 같아야 한다"
 
 
 @pytest.mark.asyncio

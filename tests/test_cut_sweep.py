@@ -65,7 +65,7 @@ class TestCutDoesNotReachRetrieval:
                 assert getattr(variant, field) == getattr(base, field), field
 
     def test_스윕_프리셋은_컷만_내린_rerank다(self):
-        """운영 재현군과 컷 하나만 달라야 한다 — 다른 게 섞이면 사후 스윕이 다른 구성을 잰다."""
+        """실험 통제군과 컷 하나만 달라야 한다 — 다른 게 섞이면 사후 스윕이 다른 구성을 잰다."""
         base, sweep = PRESETS["rerank"], PRESETS["rerank_cut05"]
         changed = {k for k, v in asdict(base).items() if v != asdict(sweep)[k]}
         assert changed == {"rerank_score_cutoff"}

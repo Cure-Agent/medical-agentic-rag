@@ -7,7 +7,7 @@
 
 import pytest
 
-from app.agent.graph import PRESETS
+from app.agent.graph import PRESETS, PRODUCTION_PRESET
 from app.config import Settings
 
 
@@ -25,11 +25,16 @@ def policy_for(preset: str) -> str:
 def test_rerank_cutoff_is_recorded_from_config():
     assert "-rerank3.5@" in policy_for("rerank")
     assert "-rerank9.0@" in policy_for("rerank_cut9")
+    assert "-rerank9.0@" in policy_for(PRODUCTION_PRESET)
 
 
 def test_cut_variants_are_distinguishable():
     """컷만 다른 두 구성은 문자열이 달라야 한다 — 이 단언이 원래 버그를 잡는다."""
     assert policy_for("rerank") != policy_for("rerank_cut9")
+
+
+def test_production_alias_matches_the_current_cut9_search_policy():
+    assert policy_for(PRODUCTION_PRESET) == policy_for("rerank_cut9")
 
 
 def test_no_rerank_part_without_rerank():

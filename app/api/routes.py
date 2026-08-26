@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.agent.graph import PRESETS, build_graph
+from app.agent.graph import PRESETS, PRODUCTION_PRESET, build_graph
 from app.agent.nodes import make_default_nodes
 from app.agent.state import AgentAnswer, initial_state
 from app.llm.client import make_embeddings, make_llm
@@ -16,7 +16,7 @@ router = APIRouter()
 
 class AskRequest(BaseModel):
     question: str = Field(min_length=1)
-    preset: str = "full"
+    preset: str = PRODUCTION_PRESET
 
 
 class AskResponse(BaseModel):

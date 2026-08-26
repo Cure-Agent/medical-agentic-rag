@@ -19,6 +19,10 @@ from app.agent.state import AgentState
 
 NodeFn = Callable[[AgentState], Awaitable[dict[str, Any]]]
 
+EXPERIMENT_RERANK_CUTOFF = 3.5
+PRODUCTION_RERANK_CUTOFF = 9.0
+PRODUCTION_PRESET = "prod_rerank"
+
 
 @dataclass(frozen=True)
 class AgentConfig:
@@ -32,10 +36,11 @@ class AgentConfig:
     # True면 하위 질의 후보를 병합해 **원 질문으로 1회** 재정렬한다 (분해 변형 B).
     # False면 하위 질의마다 재정렬한다 (변형 A). enable_rerank=True일 때만 의미가 있다.
     fuse_before_rerank: bool = False
-    # 컷 3.5: 안전을 answerer 게이트로 옮긴 뒤의 값이다. 9는 이 게이트가 안전을 혼자
-    # 책임지던 시절의 값인데, LLM 자가보고 정수라 재표현에 7↔10으로 흔들려(실측) 컷 근처가
-    # 불안정했다. 무관 문항은 0~2에 몰려 있어 낮은 컷이 오히려 안정적이다 — 역할은 비용 절감.
-    rerank_score_cutoff: float = 3.5
+    # 3.5는 이 저장소의 2026-08-23~24 실험값이다. 이후 운영 229문항 × 2회 컷 스윕에서
+    # 생성 게이트가 전 컷의 누출을 막는 것이 확인됐지만, 비용 절감을 위해 운영값 9를 유지했다.
+    # 과거 결과의 preset 의미를 바꾸지 않기 위해 기본 실험값은 보존하고, 현재 운영 검색 정책은
+    # `prod_rerank`가 명시적으로 9를 쓴다.
+    rerank_score_cutoff: float = EXPERIMENT_RERANK_CUTOFF
     # answerer가 받는 근거 수. 질의당 상한이므로 분해 구성에서는 질의 수만큼 곱해진다
     top_k: int = 5
     # True면 answerer가 질문의 축을 먼저 열거하고 축마다 답한다. **검색 경로는 그대로다** —
@@ -49,8 +54,8 @@ PRESETS: dict[str, AgentConfig] = {
     "baseline": AgentConfig(enable_decomposition=False, enable_evaluator=False),
     "decomposition": AgentConfig(enable_decomposition=True, enable_evaluator=False),
     "full": AgentConfig(enable_decomposition=True, enable_evaluator=True, max_retrieval=2),
-    # ─ 운영 패리티 구성 — 이식 판단은 이 축에서 해야 한다 ─
-    # rerank: cure-agent-be 운영 재현(하이브리드 → 리랭크 → top-5 → 점수 게이트)
+    # ─ 2026-08-23~24 실험 구성 — 당시 결과 파일의 의미를 보존한다 ─
+    # rerank: 운영과 검색 구조는 같지만 점수 컷은 실험값 3.5다.
     "rerank": AgentConfig(enable_decomposition=False, enable_evaluator=False, enable_rerank=True),
     # rerank_topk11: **근거 개수 통제군.** decomposition은 질의별 top-5를 합쳐 complex에서
     # 평균 11개를 answerer에 넘긴다(실측). 분해 없이 top_k만 11로 올린 이 구성이 따라잡으면
@@ -78,10 +83,17 @@ PRESETS: dict[str, AgentConfig] = {
     ),
 }
 
-# 반복 검색 루프 실험(4차) — `rerank`(운영 재현)에 **충분성 루프만** 얹은 짝이다.
+# 현재 운영 검색 정책 패리티(2026-08-25 컷 재판정 반영): 원 질문 1개 → 하이브리드 → RRF 무절단
+# → 리랭크 → top-5 → 점수 컷 9. 과거 `rerank` 결과를 조용히 다른 정책으로 바꾸지 않고
+# 별도 이름을 둔다. API 기본값과 README 실행 예제는 이 프리셋을 사용한다.
+PRESETS[PRODUCTION_PRESET] = replace(
+    PRESETS["rerank"], rerank_score_cutoff=PRODUCTION_RERANK_CUTOFF
+)
+
+# 반복 검색 루프 실험(4차) — 당시 통제군 `rerank`(컷 3.5)에 **충분성 루프만** 얹은 짝이다.
 # 통제군은 `rerank` 자신이고, 분해는 켜지 않는다 — 분해는 이미 기각됐으므로(2026-08-24)
 # 여기서 재는 것은 「원 질문 1개로 검색한 뒤, 부족하면 질의를 새로 만들어 다시 검색하는 것이
-# 운영 패리티 위에서 이득인가」 하나다.
+# 같은 리랭크 검색 구조 위에서 이득인가」 하나다.
 #
 # **주의: 이 구성에는 리랭크 점수 게이트가 없다.** enable_evaluator=True면 `build_graph`가
 # `route_after_evaluate`만 배선하고 `route_gate`를 지나지 않는다 — 기권 판정이 점수 게이트에서
@@ -91,15 +103,17 @@ PRESETS: dict[str, AgentConfig] = {
 # v1의 `full`은 리랭커 없는 축에서 k=1로 잰 것이라 이 축의 근거가 못 된다(그 표는 폐기됨).
 PRESETS["rerank_full"] = replace(PRESETS["rerank"], enable_evaluator=True, max_retrieval=2)
 
-# 축 열거 실험(3차) — `rerank`(운영 재현)에서 **answerer 프롬프트만** 바꾼 짝이다.
+# 축 열거 실험(3차) — 당시 통제군 `rerank`에서 **answerer 프롬프트만** 바꾼 짝이다.
 # 분해와 달리 검색 경로·LLM 호출 수가 통제군과 완전히 같아, 차이가 나면 원인이 프롬프트 하나로
 # 특정된다. 통제군은 `rerank` 자신이다.
 PRESETS["rerank_facets"] = replace(PRESETS["rerank"], enumerate_facets=True)
 
-# 2차 실험에서 쓴 공격적 컷 — v1 결과 재현·비교용으로 남긴다
-LEGACY_RERANK_CUTOFF = 9.0
+# v1 비교에 쓴 컷 9 변형. 이후 운영 컷도 9로 유지됐지만, 과거 결과 파일명을 재현하기 위해
+# `*_cut9` 이름도 그대로 남긴다.
 for _name in ("rerank", "rerank_topk11", "rerank_decomp"):
-    PRESETS[f"{_name}_cut9"] = replace(PRESETS[_name], rerank_score_cutoff=LEGACY_RERANK_CUTOFF)
+    PRESETS[f"{_name}_cut9"] = replace(
+        PRESETS[_name], rerank_score_cutoff=PRODUCTION_RERANK_CUTOFF
+    )
 
 # 컷 스윕용 최저 컷 실행 — **컷을 재려는 것이 아니라 데이터를 넓히려는 구성이다.**
 # 컷은 라우팅에만 쓰이므로(`route_gate`) 컷 c로 돌린 결과에서 c 이상의 임의의 컷을
