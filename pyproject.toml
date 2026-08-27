@@ -1,7 +1,7 @@
 [project]
 name = "medical-agentic-rag"
 version = "0.1.0"
-description = "의료 가이드라인 Agentic RAG — query decomposition + iterative retrieval 실험"
+description = "Ablation study of Agentic RAG interventions on medical guidelines"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",

@@ -1,258 +1,402 @@
-# medical-agentic-rag
+# Medical Agentic RAG
 
-의료 가이드라인 코퍼스 위에서 **Agentic RAG가 실제로 언제 도움이 되는가**를 측정하는 실험 프로젝트.
-운영 중인 의료 RAG 서비스([cure-agent-be](https://github.com/Cure-Agent/cure-agent-be))의 하이브리드 검색을 Base Retriever로 이식하고,
-그 위에 query decomposition + iterative retrieval 루프를 얹어 ablation으로 비교한다.
+[English](README.md) | [한국어](README.ko.md)
 
-## 문제의식
+> **When does Agentic RAG actually help?**
+>
+> An ablation study of query decomposition, context expansion, facet-enumeration
+> prompting, iterative retrieval, and reranking over a production-derived medical
+> guideline RAG system.
 
-운영 시스템에서 하이브리드 검색(벡터 + 문자 n-gram, RRF 융합)으로 **후보 커버리지 1.000**을 실측한 뒤에도
-남는 오답이 있었다. 후보군에 정답이 있는데 답이 틀린다면, 남은 병목은 검색이 아니라
-**질문 구조**(다면 질문의 분해)와 **검색 종료 판단**(근거가 충분한가)이다 — 이 가설을 검증한다.
+This repository ports the hybrid retrieval path from
+[CureAgent](https://github.com/Cure-Agent/cure-agent-be), then isolates proposed
+agentic interventions so that each one can be evaluated before it reaches the
+production system.
 
-> **결과 요약 (2026-08-24)**: 분해·근거 증량·축 열거 프롬프트·반복 검색 루프는
-> **전면 도입을 정당화할 만큼 일관된 이득을 보이지 않았다.** 가장 큰 관측 효과는 리랭커에서
-> 나왔고(complex 0.17 → 0.50, 아직 k=1), 검색 경로는 원 질문 1개를 쓰는 운영 현행을 유지한다.
-> 결론은 「가설이 틀렸다」가 아니라 **「현재 증거로 에이전틱 개입을 추가할 근거가 부족하다」**다.
-> 대신 「관련도」와 「답변가능성」이 다른 질문이라는 것, 그리고 1회 실행 비교가 얼마나 쉽게
-> 뒤집히는지를 확인했다. 자세한 내용은 [실험 기록](docs/experiments/INDEX.md).
+## Research Question
 
-## 아키텍처
+CureAgent's production hybrid retriever achieved **1.000 candidate coverage** with
+dense retrieval, character n-gram retrieval, and Reciprocal Rank Fusion (RRF), yet
+incorrect answers remained. If the supporting evidence is already present in the
+candidate set, are the remaining bottlenecks:
 
-```
-                ┌────────────┐
-        질문 →  │ ① Decompose │  (하위 질의 1~4개)
-                └─────┬──────┘
-                ┌─────▼──────┐
-          ┌───→ │ ② Retrieve  │  (hybrid: pgvector cosine + pg_trgm word_similarity → RRF)
-          │     └─────┬──────┘
-          │     ┌─────▼──────┐
-          │     │ ③ Evaluate  │  (근거 충분성 판정, 구조화 출력)
-          │     └─────┬──────┘
-          │   충분 ↙       ↘ 부족
-          │  ┌──────┐    ┌───────────────┐
-          │  │Answer │    │ 예산 남음?      │
-          │  └──────┘    └──┬─────────┬──┘
-          │        예 ↙            ↘ 아니오(최대 N=2)
-          │  ┌────────────────┐   ┌────────┐
-          └─ │ Query Generator │   │ Abstain │
-             └────────────────┘   └────────┘
-```
+- the **structure of the question**, especially multi-faceted questions that may
+  benefit from decomposition; and
+- the **retrieval stopping decision**, or whether the system can tell when it has
+  enough evidence?
 
-위 그림은 `full` 구성이다. 리랭크 구성에서는 ②가 **후보 무절단 → 리랭크 → top-k → 점수 게이트**로
-바뀌고(운영 §29와 같은 순서), ④ Answer가 **생성 게이트**를 겸한다 — 근거로 답할 수 없으면
-구조화 출력의 플래그로 알리고 Abstain 경로로 빠진다.
+> **Current conclusion (2026-08-24):** Under the current evaluation setting, the
+> tested agentic interventions did not provide sufficiently consistent evidence to
+> justify production adoption. Query decomposition, additional context,
+> facet-enumeration prompting, and iterative retrieval all failed to meet the
+> rollout bar. The largest exploratory effect came from reranking
+> (complex-question accuracy 0.17 → 0.50, **k=1**), so production retains the
+> simpler single-query retrieval path. This is not evidence that Agentic RAG never
+> helps; it is a decision based on the present sample, uncertainty, mechanism, and
+> cost. See the [experiment log](docs/experiments/INDEX.md).
 
-- **재검색 예산은 LLM이 아니라 코드가 쥔다** — `app/agent/graph.py`의 라우팅 함수는 순수 함수이고 LLM 없이 단위 테스트된다.
-- 근거 풀은 chunk_id 키 dict — 라운드 간 중복이 저절로 제거된다.
-- **abstain은 실패가 아니라 정상 종료 경로다.** 의료 도메인에서는 근거 없는 답변보다 "무엇이 부족한지"를 말하는 기권이 안전하다.
-- **기권 게이트는 두 층이다** — 검색 게이트(거리·리랭크 점수)는 *관련도*를 보고 비용을 아끼며,
-  생성 게이트는 *답변가능성*을 본다. 관련도가 10/10인데 답할 수 없는 사례가 실측됐다.
-- LangGraph(1.x)가 그래프 배선, LangChain(1.x)이 구조화 출력·모델 추상화를 담당한다.
+## Production-Derived Baseline
 
-## 실험 결과
+The comparison baseline mirrors CureAgent's retrieval policy:
 
-실험별 상세 기록은 **[docs/experiments/](docs/experiments/INDEX.md)** 에 있다. 한 실험 = 한 문서이고
-끝나면 숫자를 고치지 않는다 — 뒤집히면 새 문서를 쓰고 이전 문서에는 `superseded` 또는
-사실관계 오류를 밝히는 `erratum` 배너만 붙인다.
-`results/` 원본은 gitignore로 제외하고, 관측 숫자는 문서 본문과
-[익명화된 공개 점수](docs/experiments/evidence/paired_scores.csv)에 고정한다.
+1. Embed the original question and run dense retrieval with `pgvector` cosine
+   distance.
+2. Run lexical retrieval with `pg_trgm` `word_similarity`.
+3. Fuse the untruncated union with RRF.
+4. Rerank the full candidate set with an LLM, then select the top five chunks.
+5. Apply separate retrieval and generation gates.
 
-**현재 판정: 검색 경로는 운영 현행을 유지한다.** 제안됐던 네 개입은 모두 전면 도입 기준을
-충족하지 못했다
-(complex 12문항, k=5, 숫자는 [2026-08-24 교정본](docs/experiments/2026-08-24-measurement-fix.md)과
-[루프 실험](docs/experiments/2026-08-24-retrieval-loop.md)):
-
-| 개입 | 효과 | 판정 |
+| Component | Configuration | Why it is fixed this way |
 |---|---|---|
-| query decomposition (변형 B) | +0.100 / +0.117, 부호검정 모두 4:3 | 이질성이 크고 검색층 효과도 +0.022, CI [−0.075, +0.144]로 불확실 |
-| 근거 증량 (top-5 → top-11) | **−0.083 / −0.083** | CI [−0.267, +0.067]. 이득 재현 안 됨 — 생성층/검색층 실패를 맞바꿀 뿐 |
-| answerer 축 열거 프롬프트 | **−0.067 / −0.083**, 부호검정 0:4 / 0:5 | 이득이 없고 방향이 반대일 수 있음 |
-| 반복 검색 루프 (`rerank_full`) | +0.050, 부호검정 2:2 | CI [−0.117, +0.250]. **60행 중 12행만 루프에 진입**했고 이득 대부분이 문항 1개 |
+| Dense arm | `text-embedding-3-small`, 1,536 dimensions; `pgvector` cosine distance | The corpus and queries must use the same embedding space. |
+| Lexical arm | `pg_trgm` `word_similarity`, not BM25 | Whitespace loss in the corpus makes word tokenization unreliable; character n-grams remain robust to attached particles and spacing. |
+| RRF | K=60 over the untruncated union | Candidate coverage measured 0.978 after top-30 truncation and 1.000 over the union. |
+| Lexical tie-breaking | `ORDER BY similarity DESC, id ASC` | Seventy-two ties were observed at the top-30 boundary; a secondary key makes retrieval deterministic. |
+| Distance gate | Cosine distance 0.48 | No losses were observed across 118 questions with two paraphrase styles. |
+| LLM reranker | Untruncated candidates → listwise reranking → top five; 300-character excerpts | Production evaluation improved Recall@5 from 0.780 to 0.983. |
+| Rerank score gate | Top-1 relevance cutoff | The historical `rerank` preset uses 3.5. The production-parity `prod_rerank` preset uses 9 after a [229-question, two-run cutoff sweep](https://github.com/Cure-Agent/cure-agent-be/blob/dev/docs/rag-eval/2026-08-25-cut-sweep-verdict.md). Its role is generation-cost control, not answerability. |
 
-### 공개 검증 산출물
+Reranking was initially excluded because the experiment was intended to isolate
+query understanding. That was a design error: production already uses a reranker,
+so gains measured against a no-reranker baseline cannot justify a production
+change. Reranking had already resolved many of the multi-faceted errors that the
+agentic interventions were intended to address.
 
-위 정답률 효과는 각 실험의 파이프라인 출력을 `grade-strict-v1` 채점기로 다시 잰 공개 0/1 점수에서
-재계산할 수 있다. `/`로 나눈 값은 채점 1·2회 결과이고, 루프는 1회만 채점했다. 과거 문서의
-top-5 → top-11 `0.000`은 교정 전 채점값이며, 교정 채점 2회에서는 모두 `−0.083`이었다.
-도입하지 않는다는 판정은 바뀌지 않는다.
+## Agentic Pipeline
 
-- [익명화된 문항별 점수 CSV](docs/experiments/evidence/paired_scores.csv) — `case_01` 형식의
-  가명 ID와 5회 성공 여부만 포함
-- [검산 스크립트](scripts/verify_public_results.py) — 평균 차이, 문항→실행 2단 bootstrap CI,
-  양측 부호검정을 표준 라이브러리만으로 재계산
+```text
+Question
+   │
+   ▼
+Decompose into 1–4 subqueries
+   │
+   ▼
+Hybrid Retrieve → RRF → optional Rerank
+   │
+   ▼
+Evaluate Evidence
+   │
+   ├── Sufficient ───────────────→ Answer
+   │
+   └── Insufficient
+          │
+          ├── Budget remains ────→ Generate follow-up query
+          │                              │
+          │                              └──→ Retrieve again
+          │
+          └── Budget exhausted ──→ Abstain
+```
+
+This is the `full` path. Rerank-enabled variants replace retrieval with
+**untruncated candidates → rerank → top-k → score gate**. The answer node also acts
+as a generation gate: if the retrieved evidence cannot support an answer, it emits
+a structured `insufficient_evidence` signal and routes to abstention.
+
+- **Code, not the LLM, owns the retry budget.** Routing functions in
+  `app/agent/graph.py` are pure and unit-tested without model calls.
+- Evidence is stored in a `chunk_id`-keyed dictionary, which removes duplicates
+  across retrieval rounds.
+- **Abstention is a normal terminal state.** In a medical setting, explaining what
+  evidence is missing is preferable to generating an unsupported answer.
+- **The two gates answer different questions.** Retrieval gates estimate
+  *relevance* and avoid unnecessary generation cost; the generation gate estimates
+  *answerability*. The evaluation observed evidence rated 10/10 for relevance that
+  still could not answer the question.
+- LangGraph 1.x provides graph orchestration; LangChain 1.x provides structured
+  outputs and model abstractions.
+
+## Experiments
+
+Each completed experiment has an immutable evidence document in
+[docs/experiments/](docs/experiments/INDEX.md). Observed numbers are not rewritten
+after the fact. A later result adds a `superseded` banner, while a factual or
+statistical correction adds an `erratum` banner. This preserves failed comparisons
+as evidence of how an evaluation can go wrong.
+
+The current decision is based on **12 complex questions × five pipeline runs**.
+Values separated by `/` are two `grade-strict-v1` judge passes over the same
+pipeline outputs; the retrieval-loop experiment was judged once.
+
+| Intervention | Observed effect | Decision |
+|---|---|---|
+| Query decomposition, variant B | Accuracy **+0.100 / +0.117**, 95% CIs [−0.150, +0.350] / [−0.117, +0.367]; sign counts 4:3 in both judge passes. Retrieval-layer facet coverage **+0.022**, 95% CI [−0.075, +0.144]. | Do not roll out globally. Effects ranged from −0.60 to +0.80 by question, and the retrieval-layer mechanism remains uncertain. |
+| More context, top 5 → top 11 | Accuracy **−0.083 / −0.083**, 95% CI [−0.267, +0.067]. | No reproducible gain; it traded retrieval-layer and generation-layer failures rather than removing them. |
+| Facet-enumeration answer prompt | Accuracy **−0.067 / −0.083**, 95% CIs [−0.183, +0.033] / [−0.200, +0.017]; sign counts 0:4 / 0:5. | No observed benefit, with a potentially adverse direction. |
+| Iterative retrieval, `rerank_full` | Accuracy **+0.050**; sign count 2:2, 95% CI [−0.117, +0.250]. Only 12 of 60 rows entered the loop, and most of the gain came from one question. | Do not add the loop under the current evidence and cost profile. |
+
+The earlier uncorrected top-5 → top-11 estimate was 0.000. Both corrected judge
+passes produced −0.083; the rollout decision did not change.
+
+Statistical significance is not used as the sole rollout criterion. With five
+discordant pairs, even a 5:0 split has a minimum two-sided sign-test p-value of
+0.0625. The `n=12` design is not inherently incapable of significance, but these
+observed sign counts, confidence intervals containing zero, question-level
+heterogeneity, mechanism, and cost do not support a global rollout.
+
+## Key Findings
+
+1. **Query decomposition did not show consistent gains.** A few question forms
+   improved sharply, while others regressed; the average concealed that
+   heterogeneity.
+2. **Increasing retrieved context did not improve accuracy.** More chunks changed
+   where failures occurred but did not consistently remove them.
+3. **Iterative retrieval produced limited gains.** Only three questions ever
+   entered the loop, and one question accounted for most of the observed benefit.
+4. **Reranking produced the largest observed improvement.** The 0.17 → 0.50 result
+   is still exploratory because it came from the superseded k=1 ablation, but it
+   exposed the importance of using a production-parity baseline.
+5. **Relevance and answerability require separate gates.** A retrieval score is
+   useful for controlling generation cost; it cannot determine whether the
+   evidence is sufficient to answer a multi-part question.
+
+These findings do **not** imply that the current retriever is sufficient. Corrected
+complex-question accuracy was 0.600 for one control comparison, and `cpx-010`
+failed in all five runs under every tested configuration.
+
+The retrieval loop also reduced unstable questions—those that succeeded in only
+some runs—from four to two. This is separate from average accuracy and comes from
+one k=5 experiment, so it remains an observation to reproduce rather than a claim.
+
+## Evaluation Methodology
+
+The full dataset contains 36 questions: 12 simple, 12 complex, and 12 deliberately
+insufficient questions. Correct behavior is category-specific: answerable questions
+must cover every required key point without abstaining, while insufficient
+questions should abstain.
+
+The main repeated ablations use:
+
+- five independent pipeline runs per configuration;
+- strict key-point grading with explicit recommendation-grade reconciliation;
+- question-level accuracy and key-point coverage;
+- retrieval-layer facet coverage to distinguish retrieval failures from generation
+  failures;
+- paired per-question success rates, a two-stage bootstrap over questions and
+  runs, and a two-sided exact sign test; and
+- result metadata including the code commit (`code_version`), judge ruleset,
+  dataset, preset, model, repetition count, and API-error count.
+
+The evaluator was itself measured twice. Across 639 key-point decisions, four
+changed between judge passes (0.6%), with no abstention decisions changing. That
+allowed the project to distinguish a measurement correction from evaluator noise.
+
+## What We Learned About Evaluating RAG Systems
+
+The most valuable result is not a winning configuration. It is a record of how the
+measurements failed and how those failures changed the decision.
+
+1. **A single run is not an experiment.** The first control score was 0.75; its
+   five-run estimate was 0.600. Four of 12 questions changed outcome across runs.
+   Non-determinism began in the reranker, not only in generation: for the same
+   questions and candidates, the top-five set changed in 21 of 36 cases.
+2. **A comparison without a commit hash may be invalid.** Eight rows in the first
+   ablation came from different code epochs. File timestamps and trace fingerprints
+   were needed to reconstruct the mistake. `run_eval` now records `code_version`
+   on every result row.
+3. **Answer accuracy alone cannot distinguish retrieval failures from generation
+   failures.** Supporting-chunk coverage must be measured independently at the
+   key-point level before deciding where to intervene.
+4. **Control configurations can fail silently.** A context-size control once
+   collapsed into the production control because the reranker request count was
+   fixed. A prompt flag also failed to reach its node, causing two configurations
+   to run the same prompt. Both paths are now protected by tests.
+5. **The evaluator must also be repeated.** Without a second judge pass, the shift
+   from +0.217 to +0.100 / +0.117 could have been mislabeled as noise instead of a
+   correction to gold labels and grading logic.
+6. **Writing a rule in a prompt does not enforce it.** A recommendation-grade rule
+   was present from the start and was still violated 10/10 times for one key point.
+   The evaluator now extracts grades first and reconciles them deterministically in
+   code (`evals/judge.py::reconcile_grade`).
+7. **LLM labelers can match format instead of content.** Repeated recommendation
+   templates caused the labeler to select evidence for the wrong intervention when
+   the excerpt omitted the leading subject. Five of 33 key points were mislabeled
+   this way.
+
+## Reproducibility
+
+The repository includes the authored evaluation questions and expected key points,
+but not generated answers, retrieved chunks, source-document IDs, or the vector
+database. The aggregate effects remain independently reproducible without exposing
+those materials:
+
+- [Anonymized paired binary scores](docs/experiments/evidence/paired_scores.csv)
+  use pseudonymous IDs such as `case_01` and contain only five-run success values.
+- [The verification script](scripts/verify_public_results.py) recomputes mean
+  differences, two-stage bootstrap confidence intervals, and two-sided sign tests
+  using only the Python standard library.
 
 ```bash
 python scripts/verify_public_results.py
 ```
 
-질문·답변·검색 chunk·원문 ID·벡터 DB는 공개 산출물에 포함하지 않는다.
+Experiment outputs under `results/` are intentionally gitignored and may be
+overwritten. The observed figures are fixed in the experiment documents and in the
+anonymized score artifact.
 
-루프 실험에서 하나 남았다 — 흔들림 문항(k회 중 일부만 성공)이 4개에서 2개로 줄었다.
-정답률과 별개의 관측이고 k=5 한 판이라 아직 주장하지 않는다.
+### Limitations
 
-**유의성만으로 도입 여부를 정하지 않는다.** 정확히는 불일치쌍이 5개인 비교에서는 다섯 개가
-전부 한쪽이어도 양측 부호검정의 최솟값이 p=0.0625다. n=12 설계 자체가 원리적으로 유의할 수
-없는 것은 아니다. 여기서는 관측된 부호(4:3, 0:5, 2:2), 0을 포함하는 CI, 문항별 이질성,
-검색층 기전과 비용을 함께 보고 전면 도입 근거가 부족하다고 판단했다.
+- The repeated intervention results use 12 complex questions; one question moves
+  accuracy by 8.3 percentage points, and all reported intervention CIs include
+  zero.
+- Eleven key-point evidence labels were reviewed with an LLM-assisted workflow but
+  have not yet received final human review.
+- Simple questions were not regraded after the strict recommendation-grade rule was
+  introduced.
+- `cpx-010` remains unexplained after failing in every configuration and run.
+- The iterative path bypasses the rerank score gate by construction. This did not
+  affect the complex set, whose scores were 8–10, but its cost on insufficient
+  questions has not been measured.
 
-이것은 「분해를 추가할 근거가 없다」이지 「현재 검색이 충분하다」가 아니다. complex 정답률은
-0.600이고 cpx-010은 모든 구성에서 5회 내내 0/5다.
+## Running the Experiments
 
-강하게 남은 관측(아직 k=1 근거 포함): 리랭커가 단일 최대 지렛대, 두 층 기권 게이트,
-점수 게이트의 역할은 안전이 아니라 비용 절감.
-
-### 방법론에서 배운 것
-
-이 프로젝트의 가장 값진 산출물은 표의 숫자가 아니라 **그 숫자가 어떻게 틀렸는지**다.
-
-1. **k=1 비교는 노이즈를 본다.** 1차 실험의 「통제군 0.75 대 분해 0.83」에서 통제군의 참값은
-   0.600이었다(운 좋은 실행). 12문항 중 4문항이 실행마다 뒤집힌다. 추론 모델이라 temperature를
-   고정할 수 없고, 비결정성은 생성층이 아니라 **리랭커부터** 시작된다 — 같은 질문·같은 후보에
-   top-5가 36문항 중 21건 달라졌다.
-2. **결과에 커밋 해시가 없으면 비교가 무효가 될 수 있다.** 1차 실험 표의 8행이 같은 코드에서
-   나오지 않았고, 파일 mtime과 trace 지문으로 역추적해야 했다. 지금은 `run_eval`이 결과 행마다
-   `code_version`을 박는다.
-3. **정답률은 검색 실패와 생성 실패를 구분하지 못한다.** key point 단위로 「지지 청크가 풀에
-   들어왔는가」를 따로 재야 개입을 어디에 걸지 결정할 수 있다(`evals/facet_coverage.py`).
-4. **통제군은 조용히 무너진다.** 근거 개수 통제군이 리랭커 요청 개수 고정 때문에 운영 재현군과
-   같아진 적이 있고, 프롬프트 플래그가 노드까지 닿지 않으면 두 구성이 같은 프롬프트로 돌면서
-   「차이 없음」이 나온다. 둘 다 테스트로 잠가 두었다.
-5. **측정기도 반복해야 한다.** 파이프라인은 5회 돌리면서 채점은 파일당 한 번씩 돌렸다.
-   채점을 2회 돌려 보니 노이즈는 0.6%였고, 교정 후 효과는 +0.100 / +0.117이었다. 그래서
-   +0.217에서 줄어든 것을 「노이즈가 걷혔다」가 아니라 **「틀린 게 고쳐졌다」**로 부를 수
-   있게 됐다. 반복 없이는 그 둘을 못 가른다.
-6. **프롬프트에 규칙을 적는 것과 규칙이 지켜지는 것은 다르다.** 「권고등급이 명시되면 값까지
-   일치해야 한다」는 채점 규칙은 처음부터 프롬프트에 있었고 한 문항에서 10/10 위반됐다.
-   값을 **먼저 적게 하고** 비교는 코드가 해야 지켜진다(`evals/judge.py`의 `reconcile_grade`).
-7. **LLM 라벨러는 내용이 아니라 형식을 보고 고른다.** 같은 지침에서 권고안마다 「(3) 권고안
-   도출에 대한 설명 … 권고등급 …」이 반복되면 다른 권고안이 gold로 들어온다. 33개 kp 중
-   5개가 그랬다.
-
-## 기존 시스템에서 가져온 것 (이식 근거)
-
-| 항목 | 값 | 근거 |
-|---|---|---|
-| RRF 융합 | K=60, 합집합 무절단 | top-30 절단 시 후보 커버리지 0.978, 합집합 1.000 (실측) |
-| 키워드 arm | pg_trgm `word_similarity` (BM25 아님) | 코퍼스의 어절 경계 공백 소실 — 어절 토큰화 불성립, 문자 n-gram은 조사·붙임에 강건 |
-| 키워드 동점 처리 | `ORDER BY similarity DESC, id ASC` | top-30 경계에 동점 72건 실측 — 2차 정렬 없이는 실행마다 결과가 다름 |
-| 거리 게이트 | cosine distance 0.48 | paraphrase 2문체 118문항 손실 0 실측 |
-| 임베딩 | text-embedding-3-small (1536d) | 코퍼스와 동일 모델 — 좌표계가 다르면 코사인 거리 무의미 |
-| LLM 리랭커 | 후보 무절단 → 리스트와이즈 재정렬 → top-5, 발췌 300자 | Recall@5 0.780 → 0.983 (운영 §29 실측) |
-| 리랭크 점수 게이트 | top1 관련도 컷 | 이 실험의 `rerank`는 3.5. 운영은 [229문항 × 2회 컷 스윕](https://github.com/Cure-Agent/cure-agent-be/blob/dev/docs/rag-eval/2026-08-25-cut-sweep-verdict.md) 후 **9 유지** — 안전이 아니라 생성 호출 비용 절감용 |
-
-리랭커는 처음엔 "이 실험의 축은 query understanding이므로 검색 정책은 고정한다"며 제외했다.
-**그 판단이 틀렸다** — 운영에 리랭커가 켜져 있으므로 리랭커 없는 baseline과 비교한 이득은
-이식 판단에 쓸 수 없고, 실제로 리랭커가 다면 질문 오답의 상당 부분을 이미 풀고 있었다.
-
-## 실행
+Python 3.12+ and a PostgreSQL database with `pgvector` and `pg_trgm` are required.
+The corpus is a read-only production export loaded into the `hybrid_probe` scratch
+database.
 
 ```bash
-python3.13 -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
-cp .env.example .env   # OPENAI_API_KEY, DATABASE_URL 채우기
+cp .env.example .env  # Set OPENAI_API_KEY and DATABASE_URL
 
-pytest                          # LLM·DB 없이 도는 배선·포팅 테스트
-uvicorn app.main:app --reload   # POST /ask {"question": "...", "preset": "prod_rerank"}
+pytest
+uvicorn app.main:app --reload
+# POST /ask {"question": "...", "preset": "prod_rerank"}
 ```
 
-`prod_rerank`가 현재 운영 **검색 정책** 패리티(원 질문 1개, top-5, 점수 컷 9)이며 API 기본값이다.
-`rerank`는 2026-08-23~24 실험 결과의 의미를 보존하기 위해 컷 3.5로 남겨 둔 실험 프리셋이다.
+`prod_rerank` is the default and matches the current production retrieval policy:
+one original query, top five chunks, and a rerank cutoff of 9. The historical
+`rerank` preset keeps cutoff 3.5 so the 2026-08-23 and 2026-08-24 results remain
+reproducible.
 
-ablation 한 번:
+Run one ablation:
 
 ```bash
-python -m evals.run_eval --presets rerank,rerank_facets --categories complex --out results/run1
+python -m evals.run_eval \
+  --presets rerank,rerank_facets \
+  --categories complex \
+  --out results/run1
 python -m evals.judge --results results/run1
 python -m evals.metrics --results results/run1
 ```
 
-**k회 반복**(1회 비교는 노이즈다 — 위 방법론 1번):
+Run a five-repeat paired comparison:
 
 ```bash
 for i in 1 2 3 4 5; do
-  python -m evals.run_eval --presets <A>,<B> --categories complex --out results/rep$i
+  python -m evals.run_eval \
+    --presets <A>,<B> \
+    --categories complex \
+    --out results/rep$i
   python -m evals.judge --results results/rep$i
 done
-python -m evals.repeat_metrics --runs results/rep{1,2,3,4,5} --a <A> --b <B>
+python -m evals.repeat_metrics \
+  --runs results/rep{1,2,3,4,5} \
+  --a <A> \
+  --b <B>
 ```
 
-**리랭크 점수 컷 스윕**(컷을 몇으로 둘 것인가 — 재실행 없이 사후 계산한다):
+Sweep the rerank cutoff from one low-cutoff run:
 
 ```bash
-# 관심 구간의 하한 아래에서 한 번만 돌린다. 컷은 라우팅에만 쓰이므로
-# 이 실행 하나로 [0.5, ∞) 전 구간을 재구성할 수 있다.
+# The run cutoff must be below the range to reconstruct.
 for i in 1 2 3 4 5; do
   python -m evals.run_eval --presets rerank_cut05 --out results/cut$i
   python -m evals.judge --results results/cut$i
 done
-python -m evals.cut_sweep --runs results/cut{1,2,3,4,5} --preset rerank_cut05 --run-cut 0.5
+python -m evals.cut_sweep \
+  --runs results/cut{1,2,3,4,5} \
+  --preset rerank_cut05 \
+  --run-cut 0.5
 ```
 
-`--run-cut`은 그 실행이 **실제로** 돌아간 컷이다. 그보다 낮은 컷은 재구성할 수 없어
-도구가 거부한다 — 컷에 걸린 문항은 answerer를 거치지 않아 생성 게이트 판정이 비어 있고,
-그 칸을 기권으로 채우면 낮은 컷이 실제보다 안전해 보인다. 카테고리는 **전체**로 돌린다:
-컷의 손익은 insufficient(누출)와 answerable(과잉 기권) 양쪽에서 반대 방향으로 나므로
-complex만 돌리면 절반만 보게 된다.
+`--run-cut` must match the cutoff that was actually used. Lower cutoffs cannot be
+reconstructed because gated questions never reached the answer node; treating
+those missing decisions as abstentions would make lower cutoffs look artificially
+safe. Run the sweep over all categories because insufficient and answerable
+questions have opposing tradeoffs.
 
-**검색층 facet coverage**(정답률이 검색/생성 어느 층의 실패인지 가른다):
+Measure retrieval-layer facet coverage:
 
 ```bash
-python -m evals.facet_coverage label --runs results/rep{1,2,3,4,5}   # gold 라벨 (채점할 실행 전부)
-python -m evals.facet_gold_review --runs results/rep{1,2,3,4,5}      # 검수 대상 추리기 (아래)
-python -m evals.facet_coverage score --runs results/rep{1,2,3,4,5} --a <A> --b <B>
+python -m evals.facet_coverage label --runs results/rep{1,2,3,4,5}
+python -m evals.facet_gold_review --runs results/rep{1,2,3,4,5}
+python -m evals.facet_coverage score \
+  --runs results/rep{1,2,3,4,5} \
+  --a <A> \
+  --b <B>
 ```
 
-`facet_gold_review`는 LLM 라벨을 사람이 확인할 때 볼 것만 남긴다. 판정이
-`retrieved = bool(set(gold) & pool)`이라 gold 추가는 「없음」 → 「있음」 한 방향으로만
-움직이므로, **관측이 전부 「있음」인 key point는 재라벨해도 결과가 안 바뀐다.** 2026-08-24에
-33개가 11개로 줄었고, 그 11개가 두 실험의 「없음」 셀 100%를 만들었다.
+`facet_gold_review` uses the metric's monotonicity to reduce human review. Adding a
+supporting chunk can only change “not retrieved” to “retrieved,” so key points that
+were retrieved in every observation do not affect the comparison. This reduced the
+review set from 33 key points to 11.
 
-**채점도 반복한다**(측정기가 흔들리면 교정과 노이즈를 못 가른다):
+Repeat the judge on identical outputs:
 
 ```bash
 mkdir -p results/judge2/rep1
 for f in results/rep1/*.jsonl; do
-  case "$f" in *.judged.jsonl) ;; *) cp "$f" results/judge2/rep1/;; esac   # 원 결과만 복사
+  case "$f" in
+    *.judged.jsonl) ;;
+    *) cp "$f" results/judge2/rep1/ ;;
+  esac
 done
 python -m evals.judge --results results/judge2/rep1
 ```
 
-채점 판이 바뀌면 같은 답변의 정답률이 달라진다 — 결과 행의 `judge_rules`로 판을 구분한다.
+Rerank experiments use concurrency 1. A single request contains roughly 57
+candidates and 11k input tokens; concurrency 2 caused 10 failures in a 36-question
+run. A 12-question complex comparison with two configurations and five repeats
+takes approximately 11 minutes in the measured environment.
 
-리랭크 구성은 동시성 1로 내려간다 — 호출 1회가 후보 57개(~11k 토큰)라 2로 두면 429가 터진다
-(36문항 중 10건 실패 실측). complex 12문항 × 2구성 × 5회 ≈ 11분.
+## Tech Stack
 
-코퍼스는 운영 DB의 읽기 전용 덤프(`hybrid_probe` 스크래치 DB)를 쓴다 — 청크 + 임베딩 + pg_trgm/vector 확장.
+Python 3.12+ · FastAPI · LangGraph 1.x · LangChain 1.x · PostgreSQL · pgvector ·
+pg_trgm · Pydantic 2 · OpenAI models · pytest
 
-## 구조
+## Relationship to CureAgent
 
-```
+- [cure-agent-be](https://github.com/Cure-Agent/cure-agent-be) is the production
+  service and the source of truth for CureAgent's architecture and retrieval
+  policy.
+- This repository is the experimentation and LLM-evaluation harness. It ports the
+  production retrieval path, tests proposed changes, and sends only supported
+  interventions back to the product. Under the current evidence, the production
+  path remains unchanged.
+- [cure-agent-fe](https://github.com/Cure-Agent/cure-agent-fe) is the product-facing
+  interface for streaming answers, citations, patient workflows, and conversation
+  history.
+
+## Repository Layout
+
+```text
 app/
-  agent/graph.py                      # 배선·라우팅 + PRESETS — LLM 호출 없음, 순수 제어 흐름
-  agent/nodes/                        # 노드 = 타입 있는 입출력의 함수 (LLM 접점은 여기뿐)
-  agent/nodes/answerer.py             #   답변 + 생성 게이트(insufficient_evidence)
-  agent/state.py                      # AgentState, AnswererOutput 등 스키마
-  retrieval/hybrid.py                 # 하이브리드 검색 SQL 이식 — limit=None이 절단 지점
-  retrieval/rrf.py                    # RRF 융합 이식 (tests/test_rrf.py로 동작 동일성 고정)
-  retrieval/reranker.py               # 리스트와이즈 리랭커 이식 (§29) + 관대한 순위 파싱
-  retrieval/reranking_retriever.py    # 변형 A — 하위 질의별 리랭크
-  retrieval/fused_reranking_retriever.py  # 변형 B — 병합 후 원 질문으로 1회
-  retrieval/factory.py                # 구성별 검색 경로 조립 (절단 지점이 여기서 갈린다)
-  llm/prompts.py                      # 노드별 프롬프트 (+ 축 열거 변형)
-  api/routes.py                       # POST /ask, /ask/stream(SSE)
+  agent/graph.py                         # Graph wiring, routing, and PRESETS
+  agent/nodes/                           # Typed LLM boundary nodes
+  agent/nodes/answerer.py                # Answer generation and answerability gate
+  agent/state.py                         # AgentState and structured output schemas
+  retrieval/hybrid.py                    # Dense + lexical retrieval SQL
+  retrieval/rrf.py                       # RRF fusion, behavior locked by tests
+  retrieval/reranker.py                  # Ported listwise reranker
+  retrieval/reranking_retriever.py       # Variant A: rerank each subquery
+  retrieval/fused_reranking_retriever.py # Variant B: merge, then rerank once
+  retrieval/factory.py                   # Retrieval-path composition
+  llm/prompts.py                         # Node prompts and facet variants
+  api/routes.py                          # POST /ask and /ask/stream (SSE)
 evals/
-  dataset.jsonl                       # 평가셋 36문항
-  run_eval.py                         # ablation CLI — 결과 행에 code_version(커밋 해시) 기록
-  judge.py                            # LLM-as-judge 채점
-  metrics.py                          # preset × category 표 (1회 실행)
-  repeat_metrics.py                   # k회 반복 집계 — 문항별 성공률 + 2단 부트스트랩 CI
-  facet_coverage.py                   # 검색층 facet coverage + 실패 층위 교차표
-  facet_gold_review.py                # gold 검수 대상 추리기 — 단조성으로 33개를 11개로 좁힌다
-  cut_sweep.py                        # 리랭크 점수 컷 사후 스윕 — 실행 1회로 컷 전 구간
-  facet_gold.json                     # key point별 지지 청크 라벨 (2026-08-24 검수 반영, 사람 확인 대기)
-docs/experiments/                     # 실험 기록 (숫자 불변, 정정은 배너) — INDEX.md가 현재 판정 관리
-  evidence/paired_scores.csv          # 원문 없이 공개한 익명 0/1 점수
-scripts/verify_public_results.py      # 공개 점수에서 효과·CI·부호검정 재계산
-tests/                                # 배선·라우팅·RRF·리랭크·채점·통제조건 — 전부 오프라인
+  dataset.jsonl                          # 36-question evaluation set
+  run_eval.py                            # Ablation runner with commit metadata
+  judge.py                               # LLM-as-judge plus deterministic rules
+  metrics.py                             # Single-run preset/category metrics
+  repeat_metrics.py                      # Repeated paired metrics and bootstrap CI
+  facet_coverage.py                      # Retrieval-layer key-point coverage
+  facet_gold_review.py                   # Minimal evidence-label review set
+  cut_sweep.py                           # Post-hoc rerank cutoff sweep
+  facet_gold.json                        # Supporting-chunk labels
+docs/experiments/                        # Immutable experiment records and verdicts
+  evidence/paired_scores.csv             # Public anonymized binary scores
+scripts/verify_public_results.py         # Recompute public effects, CIs, and sign tests
+tests/                                   # Offline graph, routing, RRF, rerank, judge,
+                                         # and control-integrity tests
 ```
