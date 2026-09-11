@@ -1,5 +1,7 @@
 """Query Generator — Evaluator가 지목한 부족 정보를 채울 새 검색 질의를 만든다."""
 
+from typing import cast
+
 from langchain_core.language_models import BaseChatModel
 
 from app.agent.state import AgentState, GeneratedQueries, trace_event
@@ -20,8 +22,10 @@ def make_generate_queries_node(llm: BaseChatModel):
             f"## 이미 시도한 질의 (중복 금지)\n{tried}"
         )
         try:
-            result: GeneratedQueries = await structured.ainvoke(
-                [("system", QUERY_GENERATOR_SYSTEM), ("user", user)]
+            # 스키마 인스턴스가 온다 — 반환 표기만 dict | BaseModel이다
+            result = cast(
+                GeneratedQueries,
+                await structured.ainvoke([("system", QUERY_GENERATOR_SYSTEM), ("user", user)]),
             )
             queries = [q.strip() for q in result.queries if q.strip()]
         except Exception:

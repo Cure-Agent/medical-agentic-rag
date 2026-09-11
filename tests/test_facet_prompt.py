@@ -7,6 +7,7 @@
 """
 
 from dataclasses import asdict
+from types import FunctionType
 
 from langchain_core.language_models import BaseChatModel
 
@@ -73,9 +74,9 @@ def _system_prompt_for(preset: str) -> str:
     llm = _RecordingLLM()
     nodes = make_default_nodes(cfg, llm, FakeRetriever({}), Settings())
     # answer 노드는 클로저다 — 캡처된 system 변수를 들여다본다
-    return nodes.answer.__closure__[
-        nodes.answer.__code__.co_freevars.index("system")
-    ].cell_contents
+    answer = nodes.answer
+    assert isinstance(answer, FunctionType) and answer.__closure__ is not None
+    return answer.__closure__[answer.__code__.co_freevars.index("system")].cell_contents
 
 
 def test_flag_reaches_the_answer_node():

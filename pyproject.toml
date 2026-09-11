@@ -20,6 +20,8 @@ dev = [
     "pytest>=8",
     "pytest-asyncio>=0.24",
     "ruff>=0.6",
+    # 타입 게이트(make typecheck)는 릴리스마다 추론이 바뀌므로 정확히 고정한다 — 올릴 때 명시적으로 올린다
+    "pyright==1.1.414",
 ]
 
 [project.optional-dependencies]
@@ -27,6 +29,7 @@ dev = [
     "pytest>=8",
     "pytest-asyncio>=0.24",
     "ruff>=0.6",
+    "pyright==1.1.414",
 ]
 
 [build-system]
@@ -46,3 +49,8 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.pyright]
+include = ["app", "evals", "tests", "scripts"]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"

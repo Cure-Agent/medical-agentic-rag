@@ -14,7 +14,7 @@ import asyncio
 import logging
 
 from app.retrieval.base import Evidence, QueryResult
-from app.retrieval.reranker import OpenAiReranker, RerankCandidate
+from app.retrieval.reranker import RerankCandidate, Reranker
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class RerankingRetriever:
     def __init__(
         self,
         hybrid,
-        reranker: OpenAiReranker,
+        reranker: Reranker,
         top_k: int,
         distance_cutoff: float,
     ):

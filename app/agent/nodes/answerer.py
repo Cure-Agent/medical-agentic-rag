@@ -1,6 +1,7 @@
 """Answer / Abstain — 종료 노드. abstain은 LLM 없이 결정론적으로 만든다."""
 
 import re
+from typing import cast
 
 from langchain_core.language_models import BaseChatModel
 
@@ -53,7 +54,10 @@ def make_answer_node(llm: BaseChatModel, settings: Settings, *, enumerate_facets
             for e in best
         )
         user = f"## 질문\n{state['question']}\n\n## 근거 청크\n{pool}"
-        output: AnswererOutput = await structured.ainvoke([("system", system), ("user", user)])
+        # 스키마 인스턴스가 온다 — 반환 표기만 dict | BaseModel이다
+        output = cast(
+            AnswererOutput, await structured.ainvoke([("system", system), ("user", user)])
+        )
 
         # 빈 답변은 플래그와 무관하게 기권이다 — 모델이 플래그를 빠뜨려도 빈 본문은 못 낸다.
         # 발화 원인을 구분해 남긴다: 과잉 기권을 조사할 때 「모델이 판단해서 기권」과

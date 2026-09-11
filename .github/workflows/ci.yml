@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# PR은 최신 push만 검증한다 — main push는 머지된 커밋의 검증 기록이 남아야 하므로 취소하지 않는다
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# 잡 이름 = Makefile 타깃. 로컬 선검증(automation/ship.md Phase 2)과 같은 명령을 돈다.
+# 잡 이름을 바꾸면 main 브랜치 보호의 required checks와 automation/pipeline.md의 앵커도 함께 고친다.
+# Python은 requires-python의 하한(3.12)으로 돈다 — 선언한 최소 버전에서 깨지는 것을 여기서 잡는다.
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      - run: make lint
+
+  # 동결 게이트의 「빌드 GREEN」과 같은 검사다 (automation/freeze.md 절차 5 ②)
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      - run: make typecheck
+
+  # LLM·DB 없이 돈다 — .env가 없는 러너에서 통과해야 테스트가 외부 경계에 새지 않았다는 뜻이다.
+  # e2e(make test-e2e)는 첫 e2e 스펙에서 잡으로 추가한다.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      - run: make test
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks scan
+        uses: docker://ghcr.io/gitleaks/gitleaks:latest
+        with:
+          args: detect --source=. --redact -v

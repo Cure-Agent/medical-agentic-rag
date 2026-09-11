@@ -28,6 +28,7 @@ import json
 from collections import Counter
 from pathlib import Path
 from statistics import mean
+from typing import LiteralString
 
 import psycopg
 from psycopg.rows import dict_row
@@ -55,7 +56,7 @@ LABEL_SYSTEM = """너는 한의 임상 지침 코퍼스에서 채점 기준(key 
 - 출력은 제시된 key point 순서 그대로, 같은 개수의 배열이다.
 """
 
-CHUNK_SQL = """
+CHUNK_SQL: LiteralString = """
 SELECT ec.id AS chunk_id, ec.content, g.title AS guideline_title
 FROM evidence_chunks ec
 JOIN guideline_versions gv ON ec.guideline_version_id = gv.id
@@ -117,8 +118,9 @@ def candidate_union(
 def fetch_chunks(chunk_ids: list[str], database_url: str) -> dict[str, dict]:
     if not chunk_ids:
         return {}
-    with psycopg.connect(database_url, row_factory=dict_row) as conn:
-        rows = conn.execute(CHUNK_SQL, (chunk_ids,)).fetchall()
+    with psycopg.connect(database_url) as conn:
+        # 행 모양(dict)은 커서에서 못박는다 — connect 인자로 주면 검사기가 TupleRow로 본다
+        rows = conn.cursor(row_factory=dict_row).execute(CHUNK_SQL, (chunk_ids,)).fetchall()
     return {row["chunk_id"]: row for row in rows}
 
 

@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -41,7 +42,7 @@ def _get_agent(request: Request, preset: str):
     return agents[preset]
 
 
-def _jsonable(value):
+def _jsonable(value: Any) -> Any:
     if isinstance(value, Evidence | AgentAnswer):
         return value.model_dump()
     if isinstance(value, dict):
