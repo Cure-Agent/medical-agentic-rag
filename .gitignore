@@ -2,6 +2,9 @@
 __pycache__/
 *.pyc
 .env
+# env 변형도 무시한다 — sensitive-gate.sh가 .env.*를 막으므로 무시 목록을 맞춘다
+.env.*
+!.env.example
 .idea/
 .pytest_cache/
 .ruff_cache/
@@ -9,3 +12,20 @@ results/
 *.egg-info/
 dist/
 question_embeddings.json
+
+# ide/os
+.DS_Store
+
+# 로컬 IDE MCP 연결 (개인 환경 전용 — sensitive-gate.sh 차단 대상)
+.mcp.json
+
+# Codex — config.toml·hooks.json에 절대경로가 박혀 다른 체크아웃에서 그대로 못 쓰고,
+# hooks/*.sh는 커밋된 .claude/hooks/ 사본이라 공유할 새 내용이 없다. 프로젝트 스코프 스킬만 공유한다.
+.codex/*
+!.codex/skills/
+
+# 하네스 마이그레이션 산출물 — 어떤 런타임도 읽지 않는다 (cure-agent-be .gitignore와 같은 판단)
+.agents/
+
+# SDD 하네스 스크래치 (automation/freeze.md — /implement·/problem 공용)
+.cure-implement/
