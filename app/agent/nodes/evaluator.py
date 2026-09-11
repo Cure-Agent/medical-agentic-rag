@@ -1,5 +1,7 @@
 """③ Evidence Evaluator — 근거 풀이 질문에 답하기 충분한지 판정한다."""
 
+from typing import cast
+
 from langchain_core.language_models import BaseChatModel
 
 from app.agent.state import AgentState, EvaluatorVerdict, QueryCoverage, trace_event
@@ -46,8 +48,10 @@ def make_evaluate_node(llm: BaseChatModel, settings: Settings):
             f"## 검색에 사용한 하위 질의\n{sub_queries}\n\n"
             f"## 검색된 근거 청크\n{pool}"
         )
-        verdict: EvaluatorVerdict = await structured.ainvoke(
-            [("system", EVALUATOR_SYSTEM), ("user", user)]
+        # 스키마 인스턴스가 온다 — 반환 표기만 dict | BaseModel이다
+        verdict = cast(
+            EvaluatorVerdict,
+            await structured.ainvoke([("system", EVALUATOR_SYSTEM), ("user", user)]),
         )
         return {
             "verdict": verdict,

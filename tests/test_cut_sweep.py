@@ -11,12 +11,15 @@
 """
 
 from dataclasses import asdict, replace
+from typing import Any, cast
 
 import pytest
 
 from app.agent.graph import PRESETS, decide_rerank_gate
 from app.config import Settings
 from app.retrieval.factory import make_retriever
+from app.retrieval.reranker import OpenAiReranker
+from app.retrieval.reranking_retriever import RerankingRetriever
 from evals.cut_sweep import gate_layer, rethreshold, top1_score, validate_grid
 from evals.metrics import row_correct
 
@@ -24,7 +27,7 @@ from evals.metrics import row_correct
 def judged_row(
     item_id: str,
     category: str,
-    scores: dict[str, float] | None,
+    scores: dict[str, float | None] | None,
     effective_kind: str,
     covered: list[bool] | None = None,
 ) -> dict:
@@ -47,15 +50,21 @@ class TestCutDoesNotReachRetrieval:
         cut9 = PRESETS["rerank_cut9"]
         assert base.rerank_score_cutoff != cut9.rerank_score_cutoff, "전제: 컷만 다른 짝이다"
 
-        made = [make_retriever(cfg, None, None, settings) for cfg in (base, cut9)]
+        # 풀·임베딩은 조립 시점에 쓰이지 않는다 — 구성이 무엇을 만드는지만 본다
+        no_pool, no_embeddings = cast(Any, None), cast(Any, None)
+        made = [make_retriever(cfg, no_pool, no_embeddings, settings) for cfg in (base, cut9)]
 
         assert type(made[0]) is type(made[1])
         # 리랭크 경로에서 검색 결과를 결정하는 값 전부 — 하나라도 컷을 타면 스윕이 틀린다
         for attr in ("_top_k", "_distance_cutoff"):
             assert getattr(made[0], attr) == getattr(made[1], attr), attr
         # 요청 개수는 시스템 프롬프트에 박힌다 — 통제군을 무너뜨렸던 바로 그 값이다
-        assert made[0]._reranker._system_prompt == made[1]._reranker._system_prompt
-        assert made[0]._reranker._model == made[1]._reranker._model
+        first, second = made
+        assert isinstance(first, RerankingRetriever) and isinstance(second, RerankingRetriever)
+        a, b = first._reranker, second._reranker
+        assert isinstance(a, OpenAiReranker) and isinstance(b, OpenAiReranker)
+        assert a._system_prompt == b._system_prompt
+        assert a._model == b._model
 
     def test_컷을_바꿔도_config의_검색_필드가_그대로다(self):
         base = PRESETS["rerank"]

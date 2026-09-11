@@ -69,6 +69,13 @@ def top1_score(row: dict) -> float | None:
     return max(scores) if scores else None
 
 
+def retrieval_score(row: dict) -> float:
+    """검색 게이트가 잡은 행의 점수. `gate_layer`가 retrieval이면 점수가 반드시 있다."""
+    score = top1_score(row)
+    assert score is not None, "retrieval 층인데 점수가 없다 — gate_layer와 어긋남"
+    return score
+
+
 def rethreshold(row: dict, cut: float) -> dict:
     """judged 행을 컷 `cut`에서의 결과로 다시 쓴다.
 
@@ -282,7 +289,7 @@ def print_flips(rows: list[dict], grid: list[float]) -> None:
         for item_id, hits in sorted(by_item.items()):
             n_lost = sum(1 for r in hits if row_correct(r) and not row_correct(rethreshold(r, hi)))
             category = hits[0]["category"]
-            scores = "/".join(f"{top1_score(r):g}" for r in sorted(hits, key=top1_score))
+            scores = "/".join(f"{s:g}" for s in sorted(retrieval_score(r) for r in hits))
             verdict = (
                 f"**손해 {n_lost}회** — 정답이 기권으로 바뀐다"
                 if n_lost

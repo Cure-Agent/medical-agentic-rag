@@ -9,15 +9,23 @@ ablation은 build_graph(cfg)로 통제한다 — 표의 각 행 = 같은 노드 
   full           : decompose → retrieve → evaluate ⇄ generate_queries (≤N) → answer | abstain
 """
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable
 from dataclasses import dataclass, field, replace
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
 from langgraph.graph import END, START, StateGraph
 
 from app.agent.state import AgentState
 
-NodeFn = Callable[[AgentState], Awaitable[dict[str, Any]]]
+
+class NodeFn(Protocol):
+    """노드 구현의 모양.
+
+    LangGraph의 노드 타입은 `state`라는 이름의 매개변수를 요구하므로, 위치 전용인
+    `Callable[[AgentState], ...]`로는 표기할 수 없다.
+    """
+
+    def __call__(self, state: AgentState) -> Awaitable[dict[str, Any]]: ...
 
 EXPERIMENT_RERANK_CUTOFF = 3.5
 PRODUCTION_RERANK_CUTOFF = 9.0

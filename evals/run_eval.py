@@ -96,7 +96,9 @@ async def run_one(
 async def run_preset(preset: str, dataset: list[dict], out_dir: Path, code: str) -> None:
     settings = get_settings()
     cfg = PRESETS[preset]
-    pool = AsyncConnectionPool(settings.database_url, open=False, kwargs={"row_factory": dict_row})
+    pool: AsyncConnectionPool = AsyncConnectionPool(
+        settings.database_url, open=False, kwargs={"row_factory": dict_row}
+    )
     await pool.open()
     try:
         llm = make_llm(settings)

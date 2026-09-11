@@ -37,7 +37,6 @@ def scripted_evaluate(verdicts: list[EvaluatorVerdict]):
         verdict = remaining.pop(0)
         return {"verdict": verdict, "trace": state["trace"] + [trace_event("evaluate")]}
 
-    evaluate.remaining = remaining
     return evaluate
 
 

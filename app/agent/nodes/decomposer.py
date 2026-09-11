@@ -1,5 +1,7 @@
 """① Query Decomposer — 질문을 독립 검색 가능한 하위 질의로 분해한다."""
 
+from typing import cast
+
 from langchain_core.language_models import BaseChatModel
 
 from app.agent.state import AgentState, DecomposedQueries, trace_event
@@ -11,8 +13,12 @@ def make_decompose_node(llm: BaseChatModel):
 
     async def decompose(state: AgentState) -> dict:
         try:
-            result: DecomposedQueries = await structured.ainvoke(
-                [("system", DECOMPOSER_SYSTEM), ("user", state["question"])]
+            # 스키마 인스턴스가 온다 — 반환 표기만 dict | BaseModel이다
+            result = cast(
+                DecomposedQueries,
+                await structured.ainvoke(
+                    [("system", DECOMPOSER_SYSTEM), ("user", state["question"])]
+                ),
             )
             queries = [q.strip() for q in result.queries if q.strip()] or [state["question"]]
             fallback = False

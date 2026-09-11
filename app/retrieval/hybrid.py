@@ -10,8 +10,10 @@ word_similarity는 **비대칭**이다 — 짧은 질문이 1번 인자, 긴 본
 """
 
 import asyncio
+from typing import LiteralString
 
 from langchain_openai import OpenAIEmbeddings
+from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
 from app.config import Settings
@@ -21,7 +23,8 @@ from app.retrieval.rrf import fuse_by_rrf
 # 근거 1행의 모양은 두 arm이 같다 — 조인·선택 목록을 한 곳에 둔다.
 # embedding_model 조건: 좌표계가 다른 벡터는 코사인 거리가 무의미하다.
 # ACTIVE 조건: 폐기된 판본은 새 답변에 인용되지 않는다.
-_EVIDENCE_SELECT = """
+# LiteralString: 값은 전부 %(...)s 파라미터로 넘기고, SQL 본문은 리터럴끼리만 잇는다.
+_EVIDENCE_SELECT: LiteralString = """
 SELECT
     ec.id AS chunk_id,
     ec.content,
@@ -40,9 +43,9 @@ WHERE ec.embedding_model = %(embedding_model)s
   AND gv.status = 'ACTIVE'
 """
 
-_VECTOR_ARM = _EVIDENCE_SELECT + "ORDER BY distance ASC LIMIT %(arm_k)s"
+_VECTOR_ARM: LiteralString = _EVIDENCE_SELECT + "ORDER BY distance ASC LIMIT %(arm_k)s"
 
-_KEYWORD_ARM = _EVIDENCE_SELECT + (
+_KEYWORD_ARM: LiteralString = _EVIDENCE_SELECT + (
     "ORDER BY word_similarity(%(query)s, ec.content) DESC, ec.id ASC LIMIT %(arm_k)s"
 )
 
@@ -104,9 +107,10 @@ class HybridRetriever:
         fused = fuse_by_rrf(vector_rows, keyword_rows)
         return fused if self._limit is None else fused[: self._limit]
 
-    async def _fetch(self, sql: str, params: dict) -> list[Evidence]:
+    async def _fetch(self, sql: LiteralString, params: dict) -> list[Evidence]:
         async with self._pool.connection() as conn:
-            cursor = await conn.execute(sql, params)
+            # 행 모양(dict)을 풀 생성 인자에 기대지 않고 커서에서 못박는다
+            cursor = await conn.cursor(row_factory=dict_row).execute(sql, params)
             rows = await cursor.fetchall()
         return [
             Evidence(

@@ -3,7 +3,10 @@
 LLM judge 호출 자체는 여기서 검증하지 않는다 — 결정론 부분만 오프라인으로 돈다.
 """
 
+from typing import cast
+
 import pytest
+from langchain_core.language_models import BaseChatModel
 
 from app.agent.nodes.answerer import _citations_in
 from app.agent.state import AnswererOutput
@@ -192,7 +195,7 @@ class TestAnswererGate:
         from app.agent.state import initial_state
         from app.config import Settings
 
-        node = make_answer_node(FakeStructuredLLM(output), Settings())
+        node = make_answer_node(cast(BaseChatModel, FakeStructuredLLM(output)), Settings())
         state = initial_state("군발두통 환자의 한의 치료 권고안을 알려달라.")
         state["evidence"] = {"c1": make_evidence("c1")}
         return (await node(state))["result"]

@@ -12,6 +12,7 @@
 """
 
 import json
+from typing import Any, Protocol
 
 from openai import AsyncOpenAI
 from pydantic import BaseModel
@@ -55,6 +56,15 @@ class RerankResult(BaseModel):
 
 class RerankerError(RuntimeError):
     """호출측은 이 예외를 잡아 코사인 순위로 폴백한다 — 재시도보다 싸고 빠르다."""
+
+
+class Reranker(Protocol):
+    """리랭크 경로가 아는 리랭커 인터페이스의 전부.
+
+    테스트는 이 프로토콜의 가짜 구현을 꽂는다 (`base.Retriever`와 같은 방식).
+    """
+
+    async def rerank(self, question: str, candidates: list[RerankCandidate]) -> RerankResult: ...
 
 
 def normalize_ranking(ranking: object, candidate_count: int) -> list[int]:
@@ -115,7 +125,8 @@ class OpenAiReranker:
         except json.JSONDecodeError as error:
             raise RerankerError(f"리랭커 응답이 JSON이 아닙니다: {content[:120]}") from error
 
-        relevance = parsed.get("top1Relevance") if isinstance(parsed, dict) else None
+        # JSON 값이라 형을 알 수 없다 — 아래 float 변환의 try가 검증이다
+        relevance: Any = parsed.get("top1Relevance") if isinstance(parsed, dict) else None
         try:
             relevance_value = float(relevance)
         except (TypeError, ValueError) as error:

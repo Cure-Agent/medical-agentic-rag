@@ -292,12 +292,12 @@ class TestFusedRerankingRetriever:
         reranker = FakeReranker()
         seen: list[str] = []
 
-        async def spy(question, candidates):
-            seen.append(question)
-            return await FakeReranker.rerank(reranker, question, candidates)
+        class SpyReranker:
+            async def rerank(self, question, candidates):
+                seen.append(question)
+                return await reranker.rerank(question, candidates)
 
-        retriever = FusedRerankingRetriever(hybrid, reranker, top_k=5, distance_cutoff=0.48)
-        retriever._reranker = type("R", (), {"rerank": staticmethod(spy)})()
+        retriever = FusedRerankingRetriever(hybrid, SpyReranker(), top_k=5, distance_cutoff=0.48)
 
         await retriever.search_many(["하위1", "하위2"], question="원 질문")
 

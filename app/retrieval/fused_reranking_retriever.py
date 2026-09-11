@@ -17,13 +17,13 @@ B는 후보만 합치고 리랭크는 원 질문으로 1회다:
 import logging
 
 from app.retrieval.base import Evidence, QueryResult
-from app.retrieval.reranker import OpenAiReranker, RerankCandidate
+from app.retrieval.reranker import RerankCandidate, Reranker
 
 logger = logging.getLogger(__name__)
 
 
 class FusedRerankingRetriever:
-    def __init__(self, hybrid, reranker: OpenAiReranker, top_k: int, distance_cutoff: float):
+    def __init__(self, hybrid, reranker: Reranker, top_k: int, distance_cutoff: float):
         self._hybrid = hybrid
         self._reranker = reranker
         self._top_k = top_k
