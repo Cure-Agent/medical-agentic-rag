@@ -13,6 +13,12 @@ concurrency:
 # 잡 이름 = Makefile 타깃. 로컬 선검증(automation/ship.md Phase 2)과 같은 명령을 돈다.
 # 잡 이름을 바꾸면 main 브랜치 보호의 required checks와 automation/pipeline.md의 앵커도 함께 고친다.
 # Python은 requires-python의 하한(3.12)으로 돈다 — 선언한 최소 버전에서 깨지는 것을 여기서 잡는다.
+# 의존성은 uv.lock으로만 설치한다(uv sync --locked) — 테스트가 이미지와 같은 버전을 검증하고, 잠금이
+# pyproject.toml과 어긋나면 설치 단계에서 실패한다. uv 버전을 올리면 Dockerfile의 uv 이미지 태그도 함께 올린다.
+env:
+  UV_VERSION: "0.12.13"
+  UV_PYTHON: "3.12"
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -21,9 +27,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: pyproject.toml
-      - run: pip install -e ".[dev]"
+      - run: pip install "uv==${UV_VERSION}" && uv sync --locked
       - run: make lint
 
   # 동결 게이트의 「빌드 GREEN」과 같은 검사다 (automation/freeze.md 절차 5 ②)
@@ -34,13 +38,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: pyproject.toml
-      - run: pip install -e ".[dev]"
+      - run: pip install "uv==${UV_VERSION}" && uv sync --locked
       - run: make typecheck
 
   # LLM·DB 없이 돈다 — .env가 없는 러너에서 통과해야 테스트가 외부 경계에 새지 않았다는 뜻이다.
-  # e2e(make test-e2e)는 첫 e2e 스펙에서 잡으로 추가한다.
   test:
     runs-on: ubuntu-latest
     steps:
@@ -48,10 +49,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: pyproject.toml
-      - run: pip install -e ".[dev]"
+      - run: pip install "uv==${UV_VERSION}" && uv sync --locked
       - run: make test
+
+  # 컨테이너 테스트(tests/e2e) — 이미지를 실제로 빌드해 띄우므로 PR의 이미지 빌드 검증을 겸한다.
+  test-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "uv==${UV_VERSION}" && uv sync --locked
+      - run: make test-e2e
 
   gitleaks:
     runs-on: ubuntu-latest
@@ -63,3 +73,41 @@ jobs:
         uses: docker://ghcr.io/gitleaks/gitleaks:latest
         with:
           args: detect --source=. --redact -v
+
+  # main에 머지된 커밋만, 검증 잡이 전부 통과한 뒤에 이미지를 올린다 — 깨진 latest는 BE 배포를 실패로
+  # 끝낸다(BE docs/specs/49 위험 ⑵). 태그는 BE ci-ghcr.yml과 같은 규칙(latest + 실행 번호)이다.
+  # PR에서는 skipped로 남는다 — 머지 게이트(automation/bin/merge-gate.jq)는 SKIPPED를 통과로 친다.
+  image:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [lint, typecheck, test, test-e2e, gitleaks]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      DOCKER_IMAGE: ghcr.io/cure-agent/medical-agentic-rag
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: GHCR 로그인
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # GCP e2-standard-2가 x86_64이므로 amd64로 빌드한다 (BE ci-ghcr.yml과 같다)
+      - name: 이미지 빌드 & 푸시
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:latest
+            ${{ env.DOCKER_IMAGE }}:${{ github.run_number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

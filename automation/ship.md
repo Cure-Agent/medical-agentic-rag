@@ -70,18 +70,18 @@
 
 ## Phase 2: 검증
 
-CI(`.github/workflows/ci.yml`)의 잡은 넷이다(`lint`·`typecheck`·`test`·`gitleaks`). 그중 셋을 **같은 명령으로** 로컬 선검증하고, CI에 없는 검사 둘을 조건부로 더한다:
+CI(`.github/workflows/ci.yml`)의 PR 잡은 다섯이다(`lint`·`typecheck`·`test`·`test-e2e`·`gitleaks` — `image`는 `main` push에서만 돈다). 그중 넷을 **같은 명령으로** 로컬 선검증하고, CI에 없는 검사 하나를 조건부로 더한다:
 
 1. **린트**: `make lint`
 2. **타입 검사**: `make typecheck` — 동결 게이트의 「빌드 GREEN」과 같은 검사다
 3. **단위 테스트**: `make test`
-4. **e2e**: `make test-e2e` — **CI 잡이 아직 없으므로**, e2e 테스트가 생긴 뒤에는 여기가 머지 전 유일한 실행 지점이다. 테스트가 없으면 타깃이 알리고 통과한다. `/problem`으로 들어온 변경은 그 Phase 5-2가 이미 돌렸다
-5. **게이트 스크립트 스모크**: `automation/bin/`을 고친 변경이면 `automation/bin/smoke-test.sh` — 이것도 CI 잡이 아니다
+4. **e2e**: `make test-e2e` — 컨테이너 테스트라 Docker가 있어야 한다. CI `test-e2e` 잡과 같은 명령이다. `/problem`으로 들어온 변경은 그 Phase 5-2가 이미 돌렸다
+5. **게이트 스크립트 스모크**: `automation/bin/`을 고친 변경이면 `automation/bin/smoke-test.sh` — 이것은 CI 잡이 아니다
 
 **`gitleaks`만 로컬 선검증에서 뺀다** — 히스토리 시크릿 스캔이라 어느 변경이든 로컬 선검증 대상이 아니고, 머지 게이트가 잡는다.
 
 - 게이트 실패 시 → 실패 내용을 사용자에게 보고하고 **중단**한다 (자동 수정하지 않는다). 원인 확인은 파일 읽기 도구로 최소한만 하고, 심층 진단하지 않는다.
-- 의존성 변경(`pyproject.toml`)이 있으면 `pip install -e ".[dev]"`로 먼저 맞춘다.
+- 의존성 변경(`pyproject.toml`)이 있으면 `uv.lock`도 함께 갱신됐는지 확인하고(`uv lock --check`) `uv sync`로 로컬 환경을 먼저 맞춘다 — CI와 이미지는 `--locked`로 설치해 잠금이 어긋나면 실패한다.
 
 ## Phase 3: 브랜치 (이슈 생성 없음)
 

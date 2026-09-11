@@ -1,0 +1,8 @@
+# 빌드 컨텍스트는 허용 목록이다 — 이미지에 들어갈 것만 연다. .env(OPENAI_API_KEY·DATABASE_URL)·가상환경·
+# 실험 산출물이 컨텍스트에 실리지 않게 한다. Dockerfile이 COPY하는 경로를 늘리면 여기도 함께 연다.
+*
+!pyproject.toml
+!uv.lock
+!app/__init__.py
+!app/service/
+**/__pycache__
