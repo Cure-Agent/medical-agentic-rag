@@ -2,7 +2,7 @@
 
 feature 브랜치의 변경사항을 커밋 → `main` PR → CI 체크 → squash 머지까지 자동화한다. `ship`의 Phase 4에서 사용한다.
 
-> **이 레포의 파이프라인은 `main` 머지에서 끝난다.** 서버 배포는 cure-agent-be가 맡는다 — 이 레포에는 CD 워크플로우도 배포 대기 단계도 없다. cure-agent-fe판의 「Vercel 프로덕션 배포 확인」 단계를 옮기지 않은 이유다.
+> **이 레포의 파이프라인은 `main` 머지에서 끝난다.** 서버 배포는 cure-agent-be가 맡는다 — 이 레포에는 CD 워크플로우도 배포 대기 단계도 없다. cure-agent-fe판의 「Vercel 프로덕션 배포 확인」 단계를 옮기지 않은 이유다. 머지된 커밋의 CI `image` 잡이 서비스 이미지를 GHCR에 올리지만 파이프라인은 그것을 기다리지 않는다 — BE가 그 이미지를 당겨 배포한다.
 
 > **이 파일은 하네스 중립 「진실의 원천」이다.** 진입 어댑터(`ship`)를 통해 실행되며, 어댑터가 「폴링 실행 규칙」의 모드와 **커밋 Co-Author 트레일러**(Step 1)를 지정한다:
 >
@@ -41,7 +41,7 @@ CI 체크 대기는 `automation/bin/merge-gate.sh`로 실행한다 — 루프를
      - **라벨·담당자를 붙이지 않는다** (자동화 없음).
      - 출력 URL 끝 숫자가 `<PR 번호>`.
 5. 머지 게이트 폴링: **`automation/bin/merge-gate.sh <PR 번호> test`** (30초 간격, 최대 15분) → `MERGE_GATE_DONE` 마커. **게이트 = `mergeable` MERGEABLE + 앵커 체크(`test`) 존재 + 비차단 예외를 제외한 모든 체크가 완료·성공 (실패 0, 대기 0)** — 정확한 판정 로직은 `automation/bin/merge-gate.jq`가 원천이다(`smoke-test.sh`가 fixture로 검증한다). 체크를 이름 허용목록으로 고르지 않으므로 잡이 추가·개명돼도 게이트가 자동으로 따라간다. 앵커는 「CI가 체크를 등록하기 전의 공집합 통과」를 막기 위해 존재만 확인하는 이름이다.
-   - 이 클라이언트 게이트는 관측·진행 판단용이고, **강제는 `main` 브랜치 보호의 몫이다. 2026-09-11 실측으로 이 레포 `main`에는 브랜치 보호가 없다** (`gh api repos/Cure-Agent/medical-agentic-rag/branches/main/protection` → `404 Branch not protected`). 설정한다면 required status checks는 CI 잡 넷(`lint`·`typecheck`·`test`·`gitleaks`)이다. CI 잡 이름을 바꾸면 브랜치 보호와 위 앵커도 함께 갱신한다.
+   - 이 클라이언트 게이트는 관측·진행 판단용이고, **강제는 `main` 브랜치 보호의 몫이다. 2026-09-11 실측으로 이 레포 `main`에는 브랜치 보호가 없다** (`gh api repos/Cure-Agent/medical-agentic-rag/branches/main/protection` → `404 Branch not protected`). 설정한다면 required status checks는 PR에서 도는 CI 잡 다섯(`lint`·`typecheck`·`test`·`test-e2e`·`gitleaks`)이다 — `image` 잡은 `main` push 전용이라 PR에서는 skipped로 남는다(게이트는 SKIPPED를 통과로 친다). CI 잡 이름을 바꾸면 브랜치 보호와 위 앵커도 함께 갱신한다.
 
    > 목록을 손으로 적어 두면 실제 설정과 갈라진다. **판정의 원천은 서버 설정이지 이 문장이 아니다.** 의심스러우면 위 `gh api`로 확인하고, 확인한 값과 다르면 문장 쪽을 고친다.
 

@@ -291,9 +291,9 @@ Phase 1에서 수집한 목록.
    - **e2e를 여기서 도는 이유는 병렬 실행이 그것을 미루도록 설계돼 있기 때문이다.** Phase 4는 병렬
      에이전트에게 e2e를 금지한다. 구조적으로 미룬 대가를 갚는 자리가 여기이고, **통합된 트리에서
      e2e를 처음 밟는 지점**이 이 단계다.
-   - **e2e는 아직 CI 잡이 아니다**(`.github/workflows/ci.yml`의 잡은 `lint`·`typecheck`·`test`·`gitleaks`).
-     e2e 테스트가 생긴 뒤에는 여기와 ship Phase 2가 머지 전 유일한 실행 지점이다.
-   - `automation/bin/`을 고쳤으면 `automation/bin/smoke-test.sh`도 돈다 — 이것도 CI 잡이 아니다.
+   - e2e는 CI `test-e2e` 잡으로도 돈다(컨테이너 테스트 — Docker가 있어야 한다). 그래도 여기서 먼저
+     도는 이유는 위와 같다 — CI는 push 뒤에야 돌고, 통합된 트리의 e2e 실패는 여기서 고친다.
+   - `automation/bin/`을 고쳤으면 `automation/bin/smoke-test.sh`도 돈다 — 이것은 CI 잡이 아니다.
    - **테스트 실패는 이 시점의 정상 경로다**: 병렬 에이전트는 통합된 트리를 본 적이 없다. 실패 시
      사용자에게 떠넘기고 멈추지 않는다 — **동결을 유지한 채 구현만 수정**하고 재실행하는 루프를
      GREEN까지 반복한다.

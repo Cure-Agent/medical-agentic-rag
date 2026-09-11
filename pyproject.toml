@@ -13,6 +13,9 @@ dependencies = [
     "psycopg-pool>=3.2",
     "pydantic>=2.8",
     "pydantic-settings>=2.4",
+    # 에이전트 서비스(app/service) — BE 호출과 추적 스위치
+    "httpx>=0.28",
+    "langsmith>=0.11",
 ]
 
 [dependency-groups]
