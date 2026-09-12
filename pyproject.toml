@@ -16,6 +16,8 @@ dependencies = [
     # 에이전트 서비스(app/service) — BE 호출과 추적 스위치
     "httpx>=0.28",
     "langsmith>=0.11",
+    # 생존 관측 — 기본 레지스트리를 /metrics로 노출한다 (BE docs/specs/50)
+    "prometheus-client>=0.26",
 ]
 
 [dependency-groups]
