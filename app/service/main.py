@@ -5,7 +5,10 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from prometheus_client import make_asgi_app
 from starlette.exceptions import HTTPException
+from starlette.routing import Route
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.service.backend import BackendClient, make_http_client
 from app.service.config import ServiceSettings
@@ -14,6 +17,23 @@ from app.service.routes import router
 from app.service.tracing import configure_tracing
 
 logger = logging.getLogger(__name__)
+
+
+class _ASGIEndpoint:
+    """ASGI 앱을 **정확 경로** Route에 붙이기 위한 래퍼.
+
+    `app.mount("/metrics", ...)`는 `/metrics/<하위>`만 매칭해 `/metrics` 자체를 307로
+    `/metrics/`에 리디렉션한다(실측) — 수집기의 `metrics_path`는 `/metrics`이고 스펙은 그
+    경로의 200을 요구한다. Route는 **함수** endpoint를 `func(request) -> response`로 감싸므로,
+    ASGI로 취급되려면 함수가 아닌 콜러블이어야 한다. 정확 경로라 `/metrics/...` 하위가
+    열리지 않는 이득도 따라온다 — 노출 표면은 좁을수록 좋다.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self._app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        await self._app(scope, receive, send)
 
 
 def create_app(
@@ -38,11 +58,16 @@ def create_app(
             app.state.backend = BackendClient(http)
             yield
 
-    # 노출하는 경로는 라우터의 두 개뿐이다 — 문서 경로(/docs·/redoc·/openapi.json)를 열지 않는다
+    # 사용자 API는 라우터의 두 개뿐이다 — 문서 경로(/docs·/redoc·/openapi.json)를 열지 않는다
     app = FastAPI(
         title="cure-agent", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
     )
     app.include_router(router)
+    # 수집 표면 — 라우터 접두사(/api/v1/agent) **밖**의 맨 /metrics다. nginx는 그 접두사만
+    # 에이전트로 보내므로 접두사 밖에 두면 차단 규칙을 더하지 않아도 외부에서 닿지 않는다
+    # (BE docs/specs/50 「메트릭 경로」). 기본 레지스트리라 도메인 라벨이 0개다 —
+    # 무엇을 셀지는 기능이 붙은 뒤에 정한다. 자격을 요구하지 않는다(수집기는 자격이 없다).
+    app.router.routes.append(Route("/metrics", _ASGIEndpoint(make_asgi_app()), methods=["GET"]))
     app.add_exception_handler(HTTPException, _routing_error)
     app.add_exception_handler(Exception, _unexpected_error)
     return app
