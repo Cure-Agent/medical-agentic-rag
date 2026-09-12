@@ -112,8 +112,8 @@ Codex를 쓸 수 없으면 구현 하네스 단독 폴백으로 진행하되, **
    TO=""; command -v timeout >/dev/null && TO="timeout 480"; command -v gtimeout >/dev/null && TO="gtimeout 480"
    $TO codex exec --sandbox workspace-write -C <이 레포 절대경로> \
      --ephemeral \
-     -m gpt-5.6-sol \
-     -c model_reasoning_effort="max" \
+     -m gpt-6-astra \
+     -c model_reasoning_effort="medium" \
      -c mcp_servers='{}' \
      --color never \
      < .cure-implement/<작업 ID>-test-prompt.md \
@@ -128,9 +128,9 @@ Codex를 쓸 수 없으면 구현 하네스 단독 폴백으로 진행하되, **
      출력 파일 존재를 확인한다. timeout으로 끊겼어도 "파일은 이미 디스크에 있을 수 있다" — 실패로
      판정하기 전에 반드시 파일을 점검하고, **재시도 전 `pgrep -fl "codex exec"`로 잔존 프로세스를
      확인**한다(살아 있으면 완료를 기다린다 — 죽이거나 병행 재시도하지 않는다)
-   - **모델·effort 모두 플래그로 명시 고정(`gpt-5.6-sol`/`max`)** — config 편차로 심판 품질이
+   - **모델·effort 모두 플래그로 명시 고정(`gpt-6-astra`/`medium`)** — config 편차로 심판 품질이
      조용히 열화되는 것을 막는다. 심판은 구현 루프 전체가 딛고 설 기준이므로 여기서 아끼지 않는다.
-     max는 사고 단계가 수 분 이상 길 수 있으나, 위의 "파일만 작성·자연 종료·산출물 기준 판정"
+     사고 단계가 수 분 이상 길어질 수 있으나, 위의 "파일만 작성·자연 종료·산출물 기준 판정"
      전제에서 이는 hang이 아니라 정상 대기다. **핀 모델 미가용**(model not found류) 시 기본
      모델(`-m`·effort 제거)로 1회 재시도하고 동결 커밋에 사용 모델을 명시한다
    - 실패 시 1회 재시도 → 그래도 실패면 **구현 하네스 단독 폴백** — **동결 포함 절차 동일**,
