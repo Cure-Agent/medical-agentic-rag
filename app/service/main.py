@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -14,9 +15,10 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from app.service.backend import BackendClient, make_http_client
 from app.service.config import ServiceSettings
 from app.service.envelope import INTERNAL_ERROR, NOT_FOUND, failure, new_trace_id
+from app.service.llm import AgentModels
 from app.service.routes import router
-from app.service.tracing import configure_tracing
-from app.service.turn import HEARTBEAT_INTERVAL_SECONDS, RUN_DEADLINE_SECONDS
+from app.service.tracing import configure_tracing, flush_tracing
+from app.service.turn import HEARTBEAT_INTERVAL_SECONDS, RUN_DEADLINE_SECONDS, TurnSettings
 
 logger = logging.getLogger(__name__)
 
@@ -58,18 +60,33 @@ def create_app(
     - `heartbeat_interval`: 보낼 프레임이 없을 때 `: ping`을 보내는 주기(초).
     - `run_deadline`: 실행 상한(초)이자 access 토큰 선검사 기준 — 요청 도착부터 잰다.
 
-    기동(lifespan 진입) 시 추적 스위치를 고정하고 BE 클라이언트를 연다.
+    기동(lifespan 진입) 시 추적 스위치를 고정하고 BE 클라이언트를 연다. 종료 시 추적을 flush한다.
     """
     resolved = settings if settings is not None else ServiceSettings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        configure_tracing(resolved.agent_tracing_enabled)
-        async with make_http_client(resolved.be_origin, backend_transport) as http:
-            app.state.backend = BackendClient(http)
-            yield
+        tracing = configure_tracing(resolved.agent_tracing_enabled)
+        try:
+            async with make_http_client(resolved.be_origin, backend_transport) as http:
+                backend = BackendClient(http)
+                app.state.backend = backend
+                app.state.turns = TurnSettings(
+                    backend=backend,
+                    models=AgentModels(
+                        resolved.openai_api_key,
+                        classifier=classifier_model,
+                        synthesis=synthesis_model,
+                    ),
+                    tracing=tracing,
+                    heartbeat_interval=heartbeat_interval,
+                    run_deadline=run_deadline,
+                )
+                yield
+        finally:
+            await asyncio.to_thread(flush_tracing, tracing)
 
-    # 사용자 API는 라우터의 두 개뿐이다 — 문서 경로(/docs·/redoc·/openapi.json)를 열지 않는다
+    # 사용자 API는 라우터의 것뿐이다 — 문서 경로(/docs·/redoc·/openapi.json)를 열지 않는다
     app = FastAPI(
         title="cure-agent", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
     )
