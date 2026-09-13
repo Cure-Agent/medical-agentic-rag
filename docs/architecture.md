@@ -12,6 +12,7 @@
 - **서버 배포는 cure-agent-be가 맡는다.** 이 레포의 파이프라인은 `main` 머지에서 끝나고, 머지된 커밋의 CI가 서비스 이미지를 GHCR에 올린다 — BE가 그 이미지를 당겨 배포한다 (§3, `automation/pipeline.md`).
 - 이 레포는 Agentic RAG ablation 연구 저장소로 시작했다. 연구 종료 시점의 코드는 태그 **`ablation-study`**(6377f3b)로 고정했고, 판정과 증거는 `docs/experiments/`에 남는다 (§5).
 - 브라우저에게는 `/api/v1` 하나가 API 표면이다. 운영 nginx가 `/api/v1/agent/` 아래만 이 서비스로 보내고 나머지는 BE로 보낸다(BE `docs/specs/49`).
+- 에이전트는 BE를 nginx 밖(`http://app:3000`)에서 부른다. 에이전트만 쓰는 BE 내부 API(`/api/v1/internal/agent/…` — 턴 수락·지침 도구·환자 도구·근거 도구·완결)는 운영 nginx가 404로 막고 OpenAPI에서 빠진다(BE `docs/specs/51`). 계약 원문은 BE `src/domain/agent-turn/`이다.
 
 ---
 
@@ -20,13 +21,19 @@
 ```
 medical-agentic-rag/
 ├── app/
-│   ├── service/                       # 에이전트 서비스 앱 — 운영 이미지에 싣는 유일한 코드 (BE docs/specs/49)
-│   │   ├── main.py                    # create_app · lifespan(추적 스위치 고정 · BE 클라이언트)
-│   │   ├── routes.py                  # GET /api/v1/agent/healthz · GET /api/v1/agent/me
-│   │   ├── backend.py                 # BE 클라이언트 — 받은 Cookie·CSRF만 싣는다, 무응답 → 502
+│   ├── service/                       # 에이전트 서비스 앱 — 운영 이미지에 싣는 유일한 코드 (BE docs/specs/49·51)
+│   │   ├── main.py                    # create_app · lifespan(추적 스위치 · BE 클라이언트 · 턴 설정 · 종료 시 추적 flush)
+│   │   ├── routes.py                  # healthz · me · POST conversations/{id}/messages/stream(선검사 → 수락 → SSE)
+│   │   ├── turn.py                    # 에이전트 턴 — 분류 → 경로 실행 → 완결 · 하트비트 · 실행 상한 · 끊김 정리
+│   │   ├── routing.py                 # 분류기(strict JSON) · 실행 경로 표(순수 함수) · 근거 검색 입력의 라벨 제거
+│   │   ├── synthesis.py               # 환자·복합 합성 · 판정 선행 증분 파서 · 마커 → 인용 · generation 기록
+│   │   ├── llm.py                     # 분류기·합성 채팅 모델(BaseChatModel 뒤) — 기본 gpt-5.4-mini
+│   │   ├── backend.py                 # BE 클라이언트 — me·내부 API(JSON·SSE), 받은 Cookie·CSRF만 싣는다, 무응답 → 502
+│   │   ├── access_token.py            # access JWT 잔여 수명 선검사 — exp·iat만 읽고 서명은 검증하지 않는다
+│   │   ├── sse.py                     # SSE 프레임 쓰기 · BE 내부 SSE 읽기
 │   │   ├── envelope.py                # 원본 §10.1 봉투 · 미러링한 응답 코드 · 요청당 ULID traceId
-│   │   ├── config.py                  # ServiceSettings — 환경변수만 읽는다(BE_ORIGIN · AGENT_TRACING_ENABLED)
-│   │   └── tracing.py                 # LangSmith SDK 전역 추적 스위치
+│   │   ├── config.py                  # ServiceSettings — 환경변수만 읽는다(BE_ORIGIN · AGENT_TRACING_ENABLED · OPENAI_API_KEY)
+│   │   └── tracing.py                 # LangSmith 전역 추적 스위치 · 분기 뒤 숨김 클라이언트
 │   ├── main.py                        # 실험 앱 + lifespan (psycopg 풀, 프리셋별 그래프 캐시)
 │   ├── config.py                      # Settings — 실험 실행 설정, 재현성 문자열(policy_version_for)
 │   ├── api/routes.py                  # 실험 앱: GET /healthz · POST /ask · POST /ask/stream (SSE)
@@ -59,7 +66,18 @@ medical-agentic-rag/
 - **자격을 만들지 않는다.** BE 호출에는 받은 Cookie 원문과, **받았을 때만** `X-CSRF-Protection`을 싣고 그 밖의 요청 헤더는 넘기지 않는다. 사용자들이 나눠 쓰는 HTTP 클라이언트는 쿠키를 저장하지 않는다 — httpx 기본 저장소는 BE의 Set-Cookie를 담아 두었다가 다음 사용자의 요청에 싣는다(`backend.py`).
 - **BE의 판정을 바꾸지 않는다.** BE가 응답하면 상태·봉투를 그대로 돌려주고, 응답을 못 받으면(연결 실패·시간 초과) 502 `AGENT_BACKEND_UNAVAILABLE`이다 — 401로 뭉개면 BE 순단이 FE의 refresh 실패 → 강제 로그아웃이 된다. 에이전트의 JSON 응답도 원본 §10.1 봉투이고, 코드 문자열은 BE 레지스트리를 미러링한다.
 - **추적은 `AGENT_TRACING_ENABLED=true`일 때만 켜진다.** 기동 시 LangSmith SDK 전역 스위치를 고정한다 — SDK 환경변수는 한쪽 네임스페이스의 `true`로 켜지고 `false`로 끌 수 없어, `.env` 한 줄이 조용히 추적을 켠다(`tracing.py`).
+- **경로가 환자·복합으로 정해진 뒤는 숨긴다 — 분류기와 지침 경로는 보인다.** 숨김은 실행을 골라서가 아니라 분기 전체를 숨김 클라이언트(`tracing_context`)로 감싸서 건다 — 고르면 빠진다(환자 도구 출력만 숨기면 같은 기록이 합성 프롬프트로 다시 실린다). 숨김 클라이언트는 입출력을 코드가 비우고(`LANGSMITH_HIDE_*`와 무관), 메타데이터는 허용목록만, 오류는 예외 클래스 이름만 남긴다 — 오류는 `hide_*`를 거치지 않고 anonymizer만 거친다(langsmith 0.11.0 실측). 분류기 입력(질문 원문)이 남는 것은 BE §14의 명시적 예외다.
+- **자격은 추적 표면에 싣지 않는다.** Cookie·CSRF는 요청 핸들러가 쥔 채 BE 클라이언트에만 넘기고 LangChain 입력·`configurable`·메타데이터에 넣지 않는다(`configurable`은 숨김과 무관하게 메타데이터로 샌다). 턴 실행의 로그에는 예외 클래스 이름만 남긴다 — 분기 뒤 예외 메시지에는 환자 기록이 섞일 수 있다.
 - **healthz는 프로세스 생존만 본다.** BE를 부르지 않는다 — BE 장애가 에이전트 재시작·배포 롤백으로 번지지 않게 한다.
+
+**경계 원칙 — 에이전트 턴 (BE docs/specs/51):**
+
+- **라벨 차원은 코드가, 의미 차원은 LLM이 쥔다.** 분류기는 `{route, patient_labels}`만 내고 실제 경로는 실행 경로 표(`routing.plan_route`, 순수 함수)가 정한다 — 특정 환자는 질문에 적힌 케이스 라벨로만 가리킨다. 라벨 규칙을 프롬프트로 옮기면 분류가 오히려 나빠진다(BE spec 실측).
+- **수락이 LLM보다 먼저다.** 수락 호출이 인증·스코프·CSRF·중복 판정을 겸하므로, 그 앞에는 본문 검증과 토큰 잔여 수명 선검사만 둔다 — 비로그인 요청이 분류 비용을 태우지 못한다. 수락이 준 `assistantMessageId`가 끊김 복구의 기준점이다(BE §8).
+- **실행 상한이 선검사 기준이다.** 요청 도착부터 150초(`RUN_DEADLINE_SECONDS`) 안에 모든 BE 호출이 끝나야 하므로, 남은 수명이 그보다 짧은 토큰은 수락 전에 401 `AUTH_TOKEN_EXPIRED`로 돌려보낸다. 전체 수명이 상한 이하인 토큰은 검사하지 않는다 — 새로 받아도 못 넘으니 FE가 refresh 루프에 빠진다.
+- **턴을 닫는 주체는 경로마다 하나다.** 지침은 BE 지침 도구가 채팅 파이프라인으로 저장까지 하므로 에이전트는 완결을 부르지 않는다(실패·끊김에도). 환자·복합·기타는 에이전트의 완결이 닫는다 — 실패는 FAILED, 끊김은 CANCELLED이고, 종결 이벤트는 완결 응답을 받은 뒤에 보낸다. 근거 도구는 턴을 바꾸지 않는다.
+- **생산과 전송을 나눈다.** 턴 실행은 태스크가 하고 프레임을 큐에 넣으며, 응답 본문은 큐만 읽는다(유휴 시 `: ping`). 끊김으로 본문 읽기가 취소돼도 응답 객체가 턴의 정리를 차폐해 끝까지 기다린다 — 그래야 CANCELLED 완결이 간다.
+- **복합의 판정은 답을 쓰는 쪽이 한다.** 근거 도구는 게이트 ③에서 멈추고, 에이전트가 원문 근거 + 환자 기록으로 생성과 ④ 판정을 한 번에 한다. 판정 필드가 닫히기 전에는 델타를 흘리지 않는다(`synthesis.VerdictFirstParser`, BE §40 이식).
 
 **경계 원칙 — 그래프·검색:**
 
@@ -99,9 +117,11 @@ medical-agentic-rag/
 
 원본 §13의 원칙을 이 레포에 적용한다.
 
-- **단위 테스트는 LLM·임베딩·DB 없이 돈다.** 외부 경계는 가짜로 꽂는다 — `tests/conftest.py`의 `FakeRetriever`·`make_evidence`, 리랭커·LLM 대역. 서비스의 BE 호출은 요청을 기록하는 `httpx.MockTransport`로 치환한다(`create_app(backend_transport=...)`). CI 러너에는 `.env`가 없으므로, 실키에 기대는 테스트는 CI에서 드러난다.
+- **단위 테스트는 LLM·임베딩·DB 없이 돈다.** 외부 경계는 가짜로 꽂는다 — `tests/conftest.py`의 `FakeRetriever`·`make_evidence`, 리랭커·LLM 대역. 서비스의 BE 호출은 요청을 기록하는 `httpx.MockTransport`로, 분류기·합성 LLM은 LangChain 가짜 채팅 모델로 치환한다(`create_app(backend_transport=..., classifier_model=..., synthesis_model=...)`). 실행 상한·하트비트 주기도 `create_app`에 주입한다. CI 러너에는 `.env`가 없으므로, 실키에 기대는 테스트는 CI에서 드러난다.
 - **통제 조건을 테스트로 잠근다.** 구성 간 차이가 의도한 축 하나뿐인지를 단언한다(`test_facet_prompt.py`·`test_cut_sweep.py`) — 통제군이 조용히 무너진 전례가 이 레포에 있다.
 - **프로세스 전역을 바꾸는 설정은 새 프로세스에서 판정한다.** LangSmith SDK는 환경변수 조회를 `lru_cache`하고 `configure`가 프로세스 전역을 바꾸므로, 추적 테스트는 조합마다 자식 프로세스로 앱을 기동한다(`test_agent_tracing.py`). 같은 프로세스에서 조합을 바꾸면 결과가 테스트 순서에 의존한다.
+- **스트림 도중은 ASGI를 직접 구동해 본다.** starlette TestClient는 앱 호출이 끝날 때까지 응답을 버퍼링해 스트림 도중의 상태를 볼 수도, 중간에 끊을 수도 없다 — 판정 전 델타 없음·끊김 CANCELLED는 `app.router.lifespan_context(app)` 안에서 `app(scope, receive, send)`를 부르고 `receive`로 `http.disconnect`를 준다(`test_agent_stream_composite.py`).
+- **추적 숨김은 프로세스를 떠난 바이트로 판정한다.** 시나리오마다 자식 프로세스에서 캡처 서버를 `LANGSMITH_ENDPOINT`로 두고 표지 문자열을 센다(`test_agent_trace_hiding.py`). 「없다」 단언은 같은 캡처의 양성 대조(런 전송·질문 표지·합성 실행)와 짝짓는다 — 전송이 없거나 압축돼도 「없다」는 통과한다. LLM 실행의 `serialized.repr`에 모델 객체 repr이 실리므로 가짜 모델의 표지 필드는 `Field(repr=False)`로 둔다.
 - **e2e는 컨테이너 테스트다** (`tests/e2e/`, spec 49에서 확정). 레포 루트 `Dockerfile`로 이미지를 빌드해 띄우고 Docker CLI로 검사한다. Docker에 닿지 못하면 skip이 아니라 실패한다 — 조용한 skip은 조용한 통과다.
 
 ---
