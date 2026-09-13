@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from langchain_core.language_models import BaseChatModel
 from prometheus_client import make_asgi_app
 from starlette.exceptions import HTTPException
 from starlette.routing import Route
@@ -15,6 +16,7 @@ from app.service.config import ServiceSettings
 from app.service.envelope import INTERNAL_ERROR, NOT_FOUND, failure, new_trace_id
 from app.service.routes import router
 from app.service.tracing import configure_tracing
+from app.service.turn import HEARTBEAT_INTERVAL_SECONDS, RUN_DEADLINE_SECONDS
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +42,21 @@ def create_app(
     settings: ServiceSettings | None = None,
     *,
     backend_transport: httpx.AsyncBaseTransport | None = None,
+    classifier_model: BaseChatModel | None = None,
+    synthesis_model: BaseChatModel | None = None,
+    heartbeat_interval: float = HEARTBEAT_INTERVAL_SECONDS,
+    run_deadline: float = RUN_DEADLINE_SECONDS,
 ) -> FastAPI:
     """에이전트 서비스 앱을 만든다. 운영은 `uvicorn app.service.main:create_app --factory`로 띄운다.
 
     - `settings`: 생략하면 프로세스 환경변수에서 읽는다.
     - `backend_transport`: BE 호출의 HTTP 전송 계층. 생략하면 실제 네트워크를 쓴다 —
       테스트는 요청을 기록하는 가짜 전송을 꽂아 실제 BE 없이 돈다.
+    - `classifier_model`·`synthesis_model`: 분류기와 환자·복합 합성의 채팅 모델. 생략하면
+      `settings.openai_api_key`로 `AGENT_MODEL`을 만든다 — 테스트는 가짜 채팅 모델을 꽂는다.
+      호출 방식은 `app/service/routing.py`·`app/service/synthesis.py`가 정한다.
+    - `heartbeat_interval`: 보낼 프레임이 없을 때 `: ping`을 보내는 주기(초).
+    - `run_deadline`: 실행 상한(초)이자 access 토큰 선검사 기준 — 요청 도착부터 잰다.
 
     기동(lifespan 진입) 시 추적 스위치를 고정하고 BE 클라이언트를 연다.
     """

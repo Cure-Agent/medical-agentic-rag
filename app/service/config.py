@@ -14,3 +14,6 @@ class ServiceSettings(BaseSettings):
     be_origin: str = "http://localhost:3000"
     # 추적 스위치 원문 — 해석은 tracing.configure_tracing이 한다
     agent_tracing_enabled: str = ""
+    # 분류기·합성 LLM의 키 — BE와 같은 시크릿이다(BE docs/specs/51 「에이전트 LLM」). 비어 있으면
+    # 모델을 만들지 않는다: 스트림은 수락 뒤 LLM_UNAVAILABLE로 끝난다
+    openai_api_key: str = ""
