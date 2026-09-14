@@ -1,0 +1,65 @@
+{"id": "bd-patient-001", "category": "patient_record", "question": "CASE-001 환자의 현재 투약 내역을 알려줘", "expected_routes": ["PATIENT"], "expected_label": "CASE-001"}
+{"id": "bd-patient-002", "category": "patient_record", "question": "CASE-002 환자 알레르기 뭐 있어?", "expected_routes": ["PATIENT"], "expected_label": "CASE-002"}
+{"id": "bd-patient-003", "category": "patient_record", "question": "CASE-003 진단명이 뭐였지?", "expected_routes": ["PATIENT"], "expected_label": "CASE-003"}
+{"id": "bd-patient-004", "category": "patient_record", "question": "CASE-014 환자 BMI와 허리둘레 기록 보여줘", "expected_routes": ["PATIENT"], "expected_label": "CASE-014"}
+{"id": "bd-patient-005", "category": "patient_record", "question": "CASE-007의 임상 메모에 뭐라고 적혀 있어?", "expected_routes": ["PATIENT"], "expected_label": "CASE-007"}
+{"id": "bd-patient-006", "category": "patient_record", "question": "CASE-021 환자 나이랑 성별 확인해줘", "expected_routes": ["PATIENT"], "expected_label": "CASE-021"}
+{"id": "bd-patient-007", "category": "patient_record", "question": "What medications is CASE-005 currently taking?", "expected_routes": ["PATIENT"], "expected_label": "CASE-005"}
+{"id": "bd-patient-008", "category": "patient_record", "question": "Show me the allergy list for CASE-009.", "expected_routes": ["PATIENT"], "expected_label": "CASE-009"}
+{"id": "bd-patient-009", "category": "patient_record", "question": "CASE-003 환자가 메토트렉세이트 말고 다른 약도 먹고 있나?", "expected_routes": ["PATIENT"], "expected_label": "CASE-003"}
+{"id": "bd-patient-010", "category": "patient_record", "question": "CASE-011 키 몸무게 기록돼 있어?", "expected_routes": ["PATIENT"], "expected_label": "CASE-011"}
+{"id": "bd-composite-001", "category": "composite", "question": "CASE-001 환자에게 골다공증 지침상 침 치료를 고려해도 될까요?", "expected_routes": ["COMPOSITE"], "expected_label": "CASE-001"}
+{"id": "bd-composite-002", "category": "composite", "question": "CASE-002 환자에게 한약 치료를 우선 검토할 수 있는 상황인가요?", "expected_routes": ["COMPOSITE"], "expected_label": "CASE-002"}
+{"id": "bd-composite-003", "category": "composite", "question": "CASE-003 환자한테 봉약침 쓰기 전에 어떤 안전 조치가 필요해?", "expected_routes": ["COMPOSITE"], "expected_label": "CASE-003"}
+{"id": "bd-composite-004", "category": "composite", "question": "CASE-001 환자는 알렌드로네이트를 먹고 있는데 침 치료 시 주의할 점이 있나요?", "expected_routes": ["COMPOSITE"], "expected_label": "CASE-001"}
+{"id": "bd-composite-005", "category": "composite", "question": "CASE-006 환자의 만성 요통에 전침이 적절한지 지침 기준으로 판단해줘", "expected_routes": ["COMPOSITE"], "expected_label": "CASE-006"}
+{"id": "bd-composite-006", "category": "composite", "question": "Is acupuncture appropriate for CASE-004 given the migraine guideline?", "expected_routes": ["COMPOSITE"], "expected_label": "CASE-004"}
+{"id": "bd-composite-007", "category": "composite", "question": "Based on the guideline, what should I watch for when prescribing herbal medicine to CASE-012?", "expected_routes": ["COMPOSITE"], "expected_label": "CASE-012"}
+{"id": "bd-composite-008", "category": "composite", "question": "CASE-002 같은 소아 ADHD 환자에게 권고되는 1차 치료를 이 환자 기록에 맞춰 알려줘", "expected_routes": ["COMPOSITE"], "expected_label": "CASE-002"}
+{"id": "bd-composite-009", "category": "composite", "question": "CASE-008 환자 불면에 귀비탕 가감을 고려할 수 있을까?", "expected_routes": ["COMPOSITE"], "expected_label": "CASE-008"}
+{"id": "bd-composite-010", "category": "composite", "question": "CASE-003 환자에게 약침을 쓸 때 취혈 원칙은 어떻게 적용해야 하나요?", "expected_routes": ["COMPOSITE"], "expected_label": "CASE-003"}
+{"id": "bd-group-001", "category": "conditioned_group", "question": "알렌드로네이트를 복용 중인 환자에게 침 치료를 할 때 주의할 점은?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "bd-group-002", "category": "conditioned_group", "question": "고혈압약 먹는 환자한테 전침 써도 되나?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "bd-group-003", "category": "conditioned_group", "question": "항응고제 복용 중인 요통 환자에게 침 치료가 권고되나요?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "bd-group-004", "category": "conditioned_group", "question": "70대 여성 골다공증 환자에게 유침 시간은 어느 정도가 적절한가요?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "bd-group-005", "category": "conditioned_group", "question": "보호자가 양약을 원하지 않는 소아 ADHD 환자에게 한약을 우선 고려할 수 있나요?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "bd-group-006", "category": "conditioned_group", "question": "메토트렉세이트를 쓰고 있는 류마티스 관절염 환자에게 봉약침을 병행해도 되나요?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "bd-group-007", "category": "conditioned_group", "question": "임신 중인 환자의 편두통에 침 치료가 가능한가요?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "bd-group-008", "category": "conditioned_group", "question": "For a patient on warfarin with chronic low back pain, is acupuncture recommended?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "bd-group-009", "category": "conditioned_group", "question": "당뇨가 있는 불면 환자에게 한약 처방 시 고려할 점은?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "bd-group-010", "category": "conditioned_group", "question": "우리 환자 중 견과류 알레르기가 있는 소아에게 한약 처방할 때 지침이 권고하는 주의사항은?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "bd-labelvar-001", "category": "label_variant", "question": "case-003 환자 투약 내역 알려줘", "expected_routes": ["PATIENT"], "expected_label": "case-003"}
+{"id": "bd-labelvar-002", "category": "label_variant", "question": "Case-001 환자에게 침 치료 괜찮을까?", "expected_routes": ["COMPOSITE"], "expected_label": "Case-001"}
+{"id": "bd-labelvar-003", "category": "label_variant", "question": "케이스 CASE-002 알레르기 확인", "expected_routes": ["PATIENT"], "expected_label": "CASE-002"}
+{"id": "bd-labelvar-004", "category": "label_variant", "question": "CASE-001, 이 환자 골밀도 관련 침 치료 권고가 어떻게 되나요?", "expected_routes": ["COMPOSITE"], "expected_label": "CASE-001"}
+{"id": "bd-labelvar-005", "category": "label_variant", "question": "환자 CASE-003 그리고 CASE-003 둘 다 같은 사람인데 진단명 알려줘", "expected_routes": ["PATIENT"], "expected_label": "CASE-003"}
+{"id": "bd-multi-001", "category": "multi_label", "question": "CASE-001이랑 CASE-003 중 누가 더 침 치료에 적합해?", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-multi-002", "category": "multi_label", "question": "CASE-001, CASE-002, CASE-003 환자 투약 내역을 한 번에 보여줘", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-multi-003", "category": "multi_label", "question": "Compare the allergies of CASE-002 and CASE-005.", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-multi-004", "category": "multi_label", "question": "CASE-004와 CASE-009에게 같은 처방을 써도 될까요?", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-multi-005", "category": "multi_label", "question": "CASE-010 환자와 case-011 환자 중 골다공증 진단이 있는 쪽은?", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-agg-001", "category": "aggregate", "question": "우리 클리닉에 골다공증 환자가 몇 명이야?", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-agg-002", "category": "aggregate", "question": "메토트렉세이트 복용 중인 환자 목록 뽑아줘", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-agg-003", "category": "aggregate", "question": "이번 달 등록된 환자 전부 보여줘", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-agg-004", "category": "aggregate", "question": "List all patients with a peanut allergy.", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-agg-005", "category": "aggregate", "question": "환자들 평균 BMI가 얼마나 돼?", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-agg-006", "category": "aggregate", "question": "ADHD 진단 환자 중 한약 처방 받은 사람 몇 명인지 세줘", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-crud-001", "category": "crud", "question": "CASE-001 환자 투약에 칼슘제 추가해줘", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-crud-002", "category": "crud", "question": "새 환자 CASE-030을 등록해줘. 55세 남성, 편두통.", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-crud-003", "category": "crud", "question": "CASE-002 기록 삭제해", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-crud-004", "category": "crud", "question": "Update CASE-003's weight to 58 kg.", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-crud-005", "category": "crud", "question": "CASE-005 알레르기 항목에서 꽃가루 빼줘", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-other-001", "category": "chitchat_ops", "question": "안녕하세요", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-other-002", "category": "chitchat_ops", "question": "오늘 점심 뭐 먹지?", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-other-003", "category": "chitchat_ops", "question": "당귀 재고가 얼마나 남았어? 발주 넣어야 하나?", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-other-004", "category": "chitchat_ops", "question": "이 시스템 사용법 알려줘", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-other-005", "category": "chitchat_ops", "question": "Hi, what can you do?", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-other-006", "category": "chitchat_ops", "question": "다음 주 진료 예약 몇 건이야?", "expected_routes": ["OTHER"], "expected_label": null}
+{"id": "bd-demo-001", "category": "demonstrative", "question": "그 환자에게 침 치료해도 돼?", "expected_routes": ["GUIDELINE", "COMPOSITE", "PATIENT"], "expected_label": null}
+{"id": "bd-demo-002", "category": "demonstrative", "question": "이 환자에게 침 치료가 가능한가요?", "expected_routes": ["GUIDELINE", "COMPOSITE", "PATIENT"], "expected_label": null}
+{"id": "bd-demo-003", "category": "demonstrative", "question": "Can I use electroacupuncture on this patient?", "expected_routes": ["GUIDELINE", "COMPOSITE", "PATIENT"], "expected_label": null}
+{"id": "bd-guide-001", "category": "guideline_plain", "question": "만성 요통에 침 치료가 효과적인가요?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "bd-guide-002", "category": "guideline_plain", "question": "편두통 환자에서 전침치료가 양약보다 두통 강도 완화에 도움이 되나요?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "bd-guide-003", "category": "guideline_plain", "question": "What does the guideline recommend for adult primary insomnia?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "bd-guide-004", "category": "guideline_plain", "question": "천식 환자에게 침 치료 근거가 있나요?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "bd-guide-005", "category": "guideline_plain", "question": "골다공증 지침에서 권고등급 A인 치료는 뭐야?", "expected_routes": ["GUIDELINE"], "expected_label": null}

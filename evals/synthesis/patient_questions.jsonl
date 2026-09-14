@@ -1,0 +1,36 @@
+{"id": "pq-p01-a", "patient": "p01", "kind": "in_record", "question": "CASE-101 환자가 복용 중인 약과 알레르기를 알려줘"}
+{"id": "pq-p01-b", "patient": "p01", "kind": "not_in_record", "question": "CASE-101 환자의 최근 골밀도 T-score가 얼마였지?"}
+{"id": "pq-p01-c", "patient": "p01", "kind": "in_record", "question": "CASE-101 환자 골절 병력이 있나?"}
+{"id": "pq-p02-a", "patient": "p02", "kind": "in_record", "question": "CASE-102 환자 알레르기 뭐 있어?"}
+{"id": "pq-p02-b", "patient": "p02", "kind": "not_in_record", "question": "CASE-102 환자 현재 다니는 학교 학년이 어떻게 돼?"}
+{"id": "pq-p02-c", "patient": "p02", "kind": "in_record", "question": "CASE-102 환자 보호자가 양약에 대해 어떤 입장이야?"}
+{"id": "pq-p03-a", "patient": "p03", "kind": "in_record", "question": "CASE-103 환자 투약 내역 알려줘"}
+{"id": "pq-p03-b", "patient": "p03", "kind": "not_in_record", "question": "CASE-103 환자 최근 CRP 수치는?"}
+{"id": "pq-p03-c", "patient": "p03", "kind": "in_record", "question": "CASE-103 환자 조조강직 정도가 어떻다고 적혀 있어?"}
+{"id": "pq-p04-a", "patient": "p04", "kind": "in_record", "question": "CASE-104 환자가 항응고제를 먹고 있나?"}
+{"id": "pq-p04-b", "patient": "p04", "kind": "not_in_record", "question": "CASE-104 환자 INR 최근 값이 뭐야?"}
+{"id": "pq-p04-c", "patient": "p04", "kind": "in_record", "question": "CASE-104 환자 BMI와 허리둘레 알려줘"}
+{"id": "pq-p05-a", "patient": "p05", "kind": "in_record", "question": "CASE-105 환자 임신 중이야?"}
+{"id": "pq-p05-b", "patient": "p05", "kind": "not_in_record", "question": "CASE-105 환자 마지막 발작이 언제였어?"}
+{"id": "pq-p05-c", "patient": "p05", "kind": "in_record", "question": "CASE-105 환자 알레르기와 발작 빈도 알려줘"}
+{"id": "pq-p06-a", "patient": "p06", "kind": "in_record", "question": "CASE-106 환자 진단명과 투약 내역"}
+{"id": "pq-p06-b", "patient": "p06", "kind": "not_in_record", "question": "CASE-106 환자 HbA1c 최근 수치는?"}
+{"id": "pq-p06-c", "patient": "p06", "kind": "in_record", "question": "CASE-106 환자가 수면제 감량을 원하나?"}
+{"id": "pq-p07-a", "patient": "p07", "kind": "in_record", "question": "CASE-107 환자 스테로이드 언제부터 먹었어?"}
+{"id": "pq-p07-b", "patient": "p07", "kind": "not_in_record", "question": "CASE-107 환자 신경전도검사 결과 있어?"}
+{"id": "pq-p07-c", "patient": "p07", "kind": "in_record", "question": "CASE-107 환자 마비 정도가 어느 등급이야?"}
+{"id": "pq-p08-a", "patient": "p08", "kind": "in_record", "question": "CASE-108 환자 NSAIDs 써도 돼? 기록 기준으로"}
+{"id": "pq-p08-b", "patient": "p08", "kind": "not_in_record", "question": "CASE-108 환자 슬관절 X-ray 언제 찍었어?"}
+{"id": "pq-p08-c", "patient": "p08", "kind": "in_record", "question": "CASE-108 환자 키·몸무게·BMI"}
+{"id": "pq-p09-a", "patient": "p09", "kind": "in_record", "question": "CASE-109 환자 현재 항정신병약 뭐 먹어?"}
+{"id": "pq-p09-b", "patient": "p09", "kind": "not_in_record", "question": "CASE-109 환자 PANSS 점수 알려줘"}
+{"id": "pq-p09-c", "patient": "p09", "kind": "in_record", "question": "CASE-109 환자 임상 메모 요약해줘"}
+{"id": "pq-p10-a", "patient": "p10", "kind": "in_record", "question": "CASE-110 환자 알레르기 있어?"}
+{"id": "pq-p10-b", "patient": "p10", "kind": "not_in_record", "question": "CASE-110 환자 통증 NRS 점수는?"}
+{"id": "pq-p10-c", "patient": "p10", "kind": "in_record", "question": "CASE-110 환자 압통점 위치 알려줘"}
+{"id": "pq-p11-a", "patient": "p11", "kind": "in_record", "question": "CASE-111 환자 투약 전부 알려줘"}
+{"id": "pq-p11-b", "patient": "p11", "kind": "not_in_record", "question": "CASE-111 환자 요산 수치 최근 값은?"}
+{"id": "pq-p11-c", "patient": "p11", "kind": "in_record", "question": "CASE-111 환자 심부전 등급이 어떻게 돼?"}
+{"id": "pq-p12-a", "patient": "p12", "kind": "in_record", "question": "CASE-112 환자 가족력 있어?"}
+{"id": "pq-p12-b", "patient": "p12", "kind": "not_in_record", "question": "CASE-112 환자 마지막 생리가 언제였어?"}
+{"id": "pq-p12-c", "patient": "p12", "kind": "in_record", "question": "CASE-112 환자 증상 빈도와 알레르기"}

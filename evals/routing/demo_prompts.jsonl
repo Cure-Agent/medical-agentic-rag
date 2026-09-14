@@ -1,0 +1,9 @@
+{"id": "demo-001", "category": "demo_prompt", "question": "ADHD 소아·청소년에서 1차 치료는 무엇인가요?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "demo-002", "category": "demo_prompt", "question": "ADHD 소아·청소년에서 한약 치료를 우선 검토할 수 있는 임상 상황은 어떤 경우인가요?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "demo-003", "category": "demo_prompt", "question": "골다공증 환자에게 골밀도나 통증 개선을 목적으로 침 치료를 고려할 때, 유침 시간은 보통 어느 정도로 잡는 것이 적절한가요?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "demo-004", "category": "demo_prompt", "question": "만성 요통에 침 치료가 도움이 되나요?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "demo-005", "category": "demo_prompt", "question": "만성 요통에 침 치료가 효과적인가요?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "demo-006", "category": "demo_prompt", "question": "성인 류마티스 관절염 환자의 증상 완화를 위해 약침을 쓸 때, 시술 부위와 함께 어떤 취혈 원칙을 적용하고 봉약침 사용 전에는 어떤 안전 조치가 필요한가?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "demo-007", "category": "demo_prompt", "question": "성인 만성 비특이적 요통 환자에게 침 치료를 할 때, 모든 환자에게 같은 혈자리를 쓰는 표준 처방과 환자별로 달리하는 개별 처방 중 어느 쪽이 권고되나요?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "demo-008", "category": "demo_prompt", "question": "성인 원발성 불면 환자에서 불면 증상 개선을 위해 고려할 수 있는 한약 처방은 무엇인가요?", "expected_routes": ["GUIDELINE"], "expected_label": null}
+{"id": "demo-009", "category": "demo_prompt", "question": "편두통 환자에서 전침치료를 고려할 때, 일반적인 양약치료보다 증상 호전이나 두통 강도 완화에 도움이 될 수 있는가?", "expected_routes": ["GUIDELINE"], "expected_label": null}
