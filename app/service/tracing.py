@@ -2,7 +2,8 @@
 
 **추적은 `AGENT_TRACING_ENABLED`가 정확히 `"true"`일 때만 켜진다** — 아래는 켜졌을 때의 계약이다.
 엔드포인트·키는 SDK 환경변수(`LANGSMITH_ENDPOINT`·`LANGSMITH_API_KEY`)를 쓰고, 프로젝트명은
-`cure-agent`로 고정한다.
+`cure-agent`로 고정한다 — 기동 시 `configure`만으로는 부족하고 **턴마다 `traced_turn`이 다시 건다**
+(`traced_turn` docstring).
 
 - **분류기와 지침 경로는 보인다.** 분류기 실행의 입력에 질문 원문이 남는 것은 BE §14 「프롬프트
   원문 로그 금지」의 명시적 예외다 — 경로가 정해지기 전이라 숨길 기준이 없고, 오분류를 트레이스에서
@@ -101,7 +102,11 @@ def traced_turn(tracing: AgentTracing) -> Iterator[None]:
     멀쩡했다.
     추적이 꺼져 있으면 아무것도 하지 않는다.
     """
-    raise NotImplementedError
+    if tracing.visible is None:
+        yield
+        return
+    with tracing_context(project_name=TRACE_PROJECT):
+        yield
 
 
 @contextmanager
