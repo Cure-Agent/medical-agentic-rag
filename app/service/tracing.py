@@ -2,7 +2,8 @@
 
 **추적은 `AGENT_TRACING_ENABLED`가 정확히 `"true"`일 때만 켜진다** — 아래는 켜졌을 때의 계약이다.
 엔드포인트·키는 SDK 환경변수(`LANGSMITH_ENDPOINT`·`LANGSMITH_API_KEY`)를 쓰고, 프로젝트명은
-`cure-agent`로 고정한다.
+`cure-agent`로 고정한다 — 기동 시 `configure`만으로는 부족하고 **턴마다 `traced_turn`이 다시 건다**
+(`traced_turn` docstring).
 
 - **분류기와 지침 경로는 보인다.** 분류기 실행의 입력에 질문 원문이 남는 것은 BE §14 「프롬프트
   원문 로그 금지」의 명시적 예외다 — 경로가 정해지기 전이라 숨길 기준이 없고, 오분류를 트레이스에서
@@ -88,6 +89,24 @@ def hide_after_branch(value: dict[str, Any]) -> dict[str, Any]:
         match = _EXCEPTION_NAME.match(error)
         return {"error": match.group(0) if match else "Exception"}
     return {key: item for key, item in value.items() if key in HIDDEN_METADATA_KEYS}
+
+
+@contextmanager
+def traced_turn(tracing: AgentTracing) -> Iterator[None]:
+    """턴 실행 전체(분류기 포함)를 감싼다 — 이 안의 보이는 실행은 `cure-agent` 프로젝트로 간다.
+
+    `langsmith.configure(project_name=...)`는 호출한 태스크의 contextvar와 전역에 쓰지만, LangChain
+    트레이서는 프로젝트명을 **contextvar에서만** 읽고 전역 폴백이 없다(langsmith 0.11.0 ·
+    langchain-core 1.5.6). lifespan 태스크에서 건 값이 uvicorn 요청 태스크로 이어지지 않아 분류기
+    실행이 `default` 프로젝트로 갔다(2026-09-14 운영 관측). client·enabled는 전역 폴백이 있어
+    멀쩡했다.
+    추적이 꺼져 있으면 아무것도 하지 않는다.
+    """
+    if tracing.visible is None:
+        yield
+        return
+    with tracing_context(project_name=TRACE_PROJECT):
+        yield
 
 
 @contextmanager

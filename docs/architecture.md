@@ -67,6 +67,7 @@ medical-agentic-rag/
 - **BE의 판정을 바꾸지 않는다.** BE가 응답하면 상태·봉투를 그대로 돌려주고, 응답을 못 받으면(연결 실패·시간 초과) 502 `AGENT_BACKEND_UNAVAILABLE`이다 — 401로 뭉개면 BE 순단이 FE의 refresh 실패 → 강제 로그아웃이 된다. 에이전트의 JSON 응답도 원본 §10.1 봉투이고, 코드 문자열은 BE 레지스트리를 미러링한다.
 - **추적은 `AGENT_TRACING_ENABLED=true`일 때만 켜진다.** 기동 시 LangSmith SDK 전역 스위치를 고정한다 — SDK 환경변수는 한쪽 네임스페이스의 `true`로 켜지고 `false`로 끌 수 없어, `.env` 한 줄이 조용히 추적을 켠다(`tracing.py`).
 - **경로가 환자·복합으로 정해진 뒤는 숨긴다 — 분류기와 지침 경로는 보인다.** 숨김은 실행을 골라서가 아니라 분기 전체를 숨김 클라이언트(`tracing_context`)로 감싸서 건다 — 고르면 빠진다(환자 도구 출력만 숨기면 같은 기록이 합성 프롬프트로 다시 실린다). 숨김 클라이언트는 입출력을 코드가 비우고(`LANGSMITH_HIDE_*`와 무관), 메타데이터는 허용목록만, 오류는 예외 클래스 이름만 남긴다 — 오류는 `hide_*`를 거치지 않고 anonymizer만 거친다(langsmith 0.11.0 실측). 분류기 입력(질문 원문)이 남는 것은 BE §14의 명시적 예외다.
+- **프로젝트명은 턴마다 다시 건다.** `langsmith.configure(project_name=...)`는 호출한 태스크의 contextvar에만 남고 LangChain 트레이서는 전역 폴백 없이 그 contextvar만 읽는다 — lifespan에서 건 값이 요청 태스크로 이어지지 않아 분류기 실행이 `default` 프로젝트로 갔다(2026-09-14 운영 관측). `turn.py`가 턴 전체를 `tracing.traced_turn`으로 감싼다(`test_agent_trace_project.py`).
 - **자격은 추적 표면에 싣지 않는다.** Cookie·CSRF는 요청 핸들러가 쥔 채 BE 클라이언트에만 넘기고 LangChain 입력·`configurable`·메타데이터에 넣지 않는다(`configurable`은 숨김과 무관하게 메타데이터로 샌다). 턴 실행의 로그에는 예외 클래스 이름만 남긴다 — 분기 뒤 예외 메시지에는 환자 기록이 섞일 수 있다.
 - **healthz는 프로세스 생존만 본다.** BE를 부르지 않는다 — BE 장애가 에이전트 재시작·배포 롤백으로 번지지 않게 한다.
 
