@@ -103,7 +103,7 @@ from app.service.synthesis import (
     stream_composite_answer,
     stream_patient_answer,
 )
-from app.service.tracing import AgentTracing, hidden_branch
+from app.service.tracing import AgentTracing, hidden_branch, traced_turn
 
 logger = logging.getLogger(__name__)
 
@@ -214,7 +214,8 @@ class AgentTurn:
 
     async def _produce(self) -> None:
         try:
-            await self._run()
+            with traced_turn(self._settings.tracing):
+                await self._run()
         except asyncio.CancelledError:
             current = asyncio.current_task()
             if current is not None:

@@ -91,6 +91,20 @@ def hide_after_branch(value: dict[str, Any]) -> dict[str, Any]:
 
 
 @contextmanager
+def traced_turn(tracing: AgentTracing) -> Iterator[None]:
+    """턴 실행 전체(분류기 포함)를 감싼다 — 이 안의 보이는 실행은 `cure-agent` 프로젝트로 간다.
+
+    `langsmith.configure(project_name=...)`는 호출한 태스크의 contextvar와 전역에 쓰지만, LangChain
+    트레이서는 프로젝트명을 **contextvar에서만** 읽고 전역 폴백이 없다(langsmith 0.11.0 ·
+    langchain-core 1.5.6). lifespan 태스크에서 건 값이 uvicorn 요청 태스크로 이어지지 않아 분류기
+    실행이 `default` 프로젝트로 갔다(2026-09-14 운영 관측). client·enabled는 전역 폴백이 있어
+    멀쩡했다.
+    추적이 꺼져 있으면 아무것도 하지 않는다.
+    """
+    raise NotImplementedError
+
+
+@contextmanager
 def hidden_branch(tracing: AgentTracing) -> Iterator[None]:
     """이 안의 LangChain 실행은 숨김 클라이언트로 간다 — 환자·복합 경로 전체를 감싼다."""
     if tracing.hidden is None:
