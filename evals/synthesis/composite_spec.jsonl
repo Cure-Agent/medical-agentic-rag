@@ -1,0 +1,40 @@
+{"id": "cq-01", "patient": "p01", "guideline": "골다공증", "question": "CASE-101 환자에게 골다공증 지침상 침 치료를 고려해도 될까요?", "interaction": "알렌드로네이트 복용·압박골절 병력"}
+{"id": "cq-02", "patient": "p01", "guideline": "골다공증", "question": "CASE-101 환자에게 한약 치료를 병행할 때 지침이 권고하는 바는?", "interaction": "알렌드로네이트 복용"}
+{"id": "cq-03", "patient": "p01", "guideline": "골다공증", "question": "CASE-101 환자 요추 통증에 추나를 적용해도 되나요?", "interaction": "압박골절 병력"}
+{"id": "cq-04", "patient": "p02", "guideline": "주의력결핍", "question": "CASE-102 환자에게 한약 치료를 우선 검토할 수 있는 상황인가요?", "interaction": "보호자가 양약을 선호하지 않음"}
+{"id": "cq-05", "patient": "p02", "guideline": "주의력결핍", "question": "CASE-102 환자에게 침 치료를 권고할 수 있나요?", "interaction": "소아, 경도~중등도"}
+{"id": "cq-06", "patient": "p02", "guideline": "주의력결핍", "question": "CASE-102 환자 한약 처방 시 알레르기 관련해 주의할 점이 있나요?", "interaction": "땅콩·견과류 알레르기", "abstain_ok": true, "note": "뽑힌 권고 청크에 질문의 주제(알레르기/스테로이드 협진/음성증상)가 없다 — 기권도 정답 (v1 채점 뒤 수정)"}
+{"id": "cq-07", "patient": "p03", "guideline": "류마티스", "question": "CASE-103 환자한테 봉약침 쓰기 전에 어떤 안전 조치가 필요해?", "interaction": "꽃가루 알레르기"}
+{"id": "cq-08", "patient": "p03", "guideline": "류마티스", "question": "CASE-103 환자에게 한약과 메토트렉세이트 병행이 지침상 어떤가요?", "interaction": "메토트렉세이트 복용"}
+{"id": "cq-09", "patient": "p03", "guideline": "류마티스", "question": "CASE-103 환자 조조강직에 침 치료가 도움이 될까요?", "interaction": "조조강직 1시간 이상"}
+{"id": "cq-10", "patient": "p04", "guideline": "만성 요통", "question": "CASE-104 환자 만성 요통에 침 치료를 해도 괜찮을까요?", "interaction": "와파린 복용(출혈 위험)"}
+{"id": "cq-11", "patient": "p04", "guideline": "만성 요통", "question": "CASE-104 환자에게 전침이 적절한지 지침 기준으로 판단해줘", "interaction": "와파린·고혈압"}
+{"id": "cq-12", "patient": "p04", "guideline": "만성 요통", "question": "CASE-104 환자에게 추나 치료를 권고할 수 있나요?", "interaction": "항응고 중"}
+{"id": "cq-13", "patient": "p05", "guideline": "편두통", "question": "CASE-105 환자 편두통에 침 치료가 가능한가요?", "interaction": "임신 12주"}
+{"id": "cq-14", "patient": "p05", "guideline": "편두통", "question": "CASE-105 환자에게 한약 치료를 고려할 수 있나요?", "interaction": "임신 12주"}
+{"id": "cq-15", "patient": "p05", "guideline": "편두통", "question": "CASE-105 환자 예방 목적으로 전침을 쓸 수 있을까요?", "interaction": "임신"}
+{"id": "cq-16", "patient": "p06", "guideline": "불면장애", "question": "CASE-106 환자 불면에 한약 처방을 고려할 수 있을까?", "interaction": "졸피뎀 감량 희망·당뇨"}
+{"id": "cq-17", "patient": "p06", "guideline": "불면장애", "question": "CASE-106 환자에게 침 치료가 불면 개선에 도움이 될까요?", "interaction": "졸피뎀 복용"}
+{"id": "cq-18", "patient": "p06", "guideline": "불면장애", "question": "CASE-106 환자가 수면제를 줄이면서 한의 치료를 병행하는 것이 지침상 가능한가요?", "interaction": "졸피뎀 의존 우려"}
+{"id": "cq-19", "patient": "p07", "guideline": "안면신경마비", "question": "CASE-107 환자에게 침 치료를 지금 시작해도 되나요?", "interaction": "발병 5일째, 스테로이드 복용 중"}
+{"id": "cq-20", "patient": "p07", "guideline": "안면신경마비", "question": "CASE-107 환자에게 스테로이드와 한의 협진이 권고되나요?", "interaction": "프레드니솔론 복용", "abstain_ok": true, "note": "뽑힌 권고 청크에 질문의 주제(알레르기/스테로이드 협진/음성증상)가 없다 — 기권도 정답 (v1 채점 뒤 수정)"}
+{"id": "cq-21", "patient": "p07", "guideline": "안면신경마비", "question": "CASE-107 환자에게 전침이나 뜸을 쓸 수 있나요?", "interaction": "급성기"}
+{"id": "cq-22", "patient": "p08", "guideline": "퇴행성 슬관절염", "question": "CASE-108 환자 슬관절염에 침 치료가 권고되나요?", "interaction": "비만·K-L 3"}
+{"id": "cq-23", "patient": "p08", "guideline": "퇴행성 슬관절염", "question": "CASE-108 환자에게 약침이나 봉약침을 고려할 수 있나요?", "interaction": "NSAIDs 알레르기"}
+{"id": "cq-24", "patient": "p08", "guideline": "퇴행성 슬관절염", "question": "CASE-108 환자에게 한약 치료를 병행하면 어떤가요?", "interaction": "위장관 출혈 병력"}
+{"id": "cq-25", "patient": "p09", "guideline": "조현병", "question": "CASE-109 환자에게 항정신병약과 한약 병행을 고려할 수 있나요?", "interaction": "리스페리돈 유지·음성증상"}
+{"id": "cq-26", "patient": "p09", "guideline": "조현병", "question": "CASE-109 환자 음성증상에 침 치료가 도움이 되나요?", "interaction": "음성증상 지속", "abstain_ok": true, "note": "뽑힌 권고 청크에 질문의 주제(알레르기/스테로이드 협진/음성증상)가 없다 — 기권도 정답 (v1 채점 뒤 수정)"}
+{"id": "cq-27", "patient": "p10", "guideline": "근막통증", "question": "CASE-110 환자 압통점에 침 치료를 권고하나요?", "interaction": "승모근 압통점"}
+{"id": "cq-28", "patient": "p10", "guideline": "근막통증", "question": "CASE-110 환자에게 약침을 쓸 수 있나요?", "interaction": "리도카인 알레르기"}
+{"id": "cq-29", "patient": "p11", "guideline": "통풍", "question": "CASE-111 환자 통풍에 침 치료를 고려할 수 있나요?", "interaction": "회복기·심부전"}
+{"id": "cq-30", "patient": "p11", "guideline": "통풍", "question": "CASE-111 환자에게 한약 치료를 병행해도 될까요?", "interaction": "알로푸리놀·푸로세미드"}
+{"id": "cq-31", "patient": "p12", "guideline": "갱년기", "question": "CASE-112 환자 안면홍조에 한약 치료가 권고되나요?", "interaction": "유방암 가족력·대두 알레르기"}
+{"id": "cq-32", "patient": "p12", "guideline": "갱년기", "question": "CASE-112 환자에게 침 치료가 갱년기 증상에 도움이 될까요?", "interaction": "야간발한"}
+{"id": "cq-m01", "patient": "p01", "guideline": "감기", "question": "CASE-101 환자에게 골다공증 지침상 침 치료를 고려해도 될까요?", "interaction": null, "mismatch": true}
+{"id": "cq-m02", "patient": "p02", "guideline": "통풍", "question": "CASE-102 환자에게 한약 치료를 우선 검토할 수 있는 상황인가요?", "interaction": null, "mismatch": true}
+{"id": "cq-m03", "patient": "p03", "guideline": "금연", "question": "CASE-103 환자한테 봉약침 쓰기 전에 어떤 안전 조치가 필요해?", "interaction": null, "mismatch": true}
+{"id": "cq-m04", "patient": "p04", "guideline": "여성난임", "question": "CASE-104 환자 만성 요통에 침 치료를 해도 괜찮을까요?", "interaction": null, "mismatch": true}
+{"id": "cq-m05", "patient": "p05", "guideline": "전립선", "question": "CASE-105 환자 편두통에 침 치료가 가능한가요?", "interaction": null, "mismatch": true}
+{"id": "cq-m06", "patient": "p06", "guideline": "족관절", "question": "CASE-106 환자 불면에 한약 처방을 고려할 수 있을까?", "interaction": null, "mismatch": true}
+{"id": "cq-m07", "patient": "p07", "guideline": "위암", "question": "CASE-107 환자에게 침 치료를 지금 시작해도 되나요?", "interaction": null, "mismatch": true}
+{"id": "cq-m08", "patient": "p09", "guideline": "월경통", "question": "CASE-109 환자 음성증상에 침 치료가 도움이 되나요?", "interaction": null, "mismatch": true}
