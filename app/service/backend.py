@@ -26,6 +26,10 @@ BACKEND_TIMEOUT = httpx.Timeout(5.0)
 # 내부 SSE는 LLM이 느린 동안에도 BE가 15초마다 `: ping`을 보낸다(BE §8) — 그 두 배 동안 아무것도
 # 오지 않으면 BE가 응답하지 않는 것으로 본다
 STREAM_TIMEOUT = httpx.Timeout(5.0, read=30.0)
+# 완결만 읽기를 늘린다 — BE가 복합 완료 완결 안에서 임상 참고안을 구조화하고(상한 20초),
+# 그 뒤에 종결·인용·참고안을 한 tx에서 저장한다(BE docs/specs/54). connect는 5초 그대로다:
+# 읽기를 늘린 이유는 BE가 일하는 동안 기다리기 위한 것이고, BE 순단은 여전히 빨리 끝내야 한다
+FINISH_TIMEOUT = httpx.Timeout(5.0, read=30.0)
 # 내부 API 경로에 박히는 값의 모양 — BE id는 ULID다. 사용자가 보낸 대화 id가 경로 구분자·점
 # 세그먼트로 다른 내부 경로를 가리키지 못하게 한다
 _PATH_SEGMENT = re.compile(r"[A-Za-z0-9_-]{1,100}")
@@ -123,7 +127,7 @@ class BackendClient:
         self, assistant_message_id: str, body: dict[str, object], credentials: Credentials
     ) -> BackendResponse:
         path = f"{INTERNAL_AGENT_PATH}/turns/{assistant_message_id}/finish"
-        return await self._send("POST", path, body, credentials)
+        return await self._send("POST", path, body, credentials, timeout=FINISH_TIMEOUT)
 
     def guideline_answer(
         self, assistant_message_id: str, classifier_version: str, credentials: Credentials
@@ -143,10 +147,12 @@ class BackendClient:
         path: str,
         body: dict[str, object] | None,
         credentials: Credentials,
+        *,
+        timeout: httpx.Timeout = BACKEND_TIMEOUT,
     ) -> BackendResponse:
         try:
             response = await self._http.request(
-                method, path, json=body, headers=credentials.headers()
+                method, path, json=body, headers=credentials.headers(), timeout=timeout
             )
         except httpx.TransportError as e:
             raise BackendUnavailableError(repr(e)) from e
