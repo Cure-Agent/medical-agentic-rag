@@ -1,4 +1,7 @@
-"""기준 60~67의 경로별 추적 숨김과 남겨야 할 분류 입력·실행·토큰 수를 검증한다."""
+"""기준 60~67의 경로별 추적 숨김과 남겨야 할 분류 입력·실행·토큰 수를 검증한다.
+
+spec 54 기준 47(복합 완결 응답의 참고안 값이 추적 전송에 없다)도 같은 캡처로 판정한다.
+"""
 
 import base64
 import json
@@ -230,3 +233,36 @@ def test_environment_false_cannot_unhide_patient_fields(
     _guard(result, "env_false")
     for marker in result["record_markers"][field]:
         assert _bodies(result).count(marker.encode()) == 0, field
+
+
+def test_composite_guidance_unique_values_are_hidden(probe: Callable[[str], Probe]) -> None:
+    """기준 47: 완결과 종결 이벤트에 실린 참고안의 고유 표지는 추적 전송에 없다."""
+    result = probe("composite")
+    _guard(result, "composite")
+    sent = result["finish_guidances"]
+    assert len(sent) == 1, "참고안을 실은 완결 응답이 없다."
+    assert result["completed_guidances"] == sent, "종결 이벤트가 참고안을 그대로 싣지 않았다."
+    markers = result["guidance_markers"]
+    assert len(markers) == 4
+    guidance_text = json.dumps(sent, ensure_ascii=False)
+    transmitted = _bodies(result)
+    for marker in markers:
+        assert marker in guidance_text, "고유 표지가 실제 참고안에 없다."
+        assert transmitted.count(marker.encode()) == 0, marker
+
+
+def test_composite_guidance_allergy_values_are_hidden(probe: Callable[[str], Probe]) -> None:
+    """기준 47: 참고안에도 실린 환자 기록의 각 알레르기 표지는 추적 전송에 없다."""
+    result = probe("composite")
+    _guard(result, "composite")
+    sent = result["finish_guidances"]
+    assert len(sent) == 1, "참고안을 실은 완결 응답이 없다."
+    assert result["completed_guidances"] == sent, "종결 이벤트가 참고안을 그대로 싣지 않았다."
+    markers = result["guidance_allergy_markers"]
+    assert markers
+    assert markers == result["record_markers"]["allergies"]
+    alerts = json.dumps(sent[0]["safetyAlerts"], ensure_ascii=False)
+    transmitted = _bodies(result)
+    for marker in markers:
+        assert marker in alerts, "기록의 알레르기 표지가 참고안 경고에 없다."
+        assert transmitted.count(marker.encode()) == 0, marker

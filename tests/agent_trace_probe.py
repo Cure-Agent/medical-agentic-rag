@@ -161,6 +161,39 @@ def run_turn(scenario: str) -> dict[str, Any]:
     finishes: list[dict[str, Any]] = []
     backend_requests: list[dict[str, str]] = []
     stamp = "2026-09-13T00:00:00.000Z"
+    guidance_markers = [
+        "GUIDANCE_SUMMARY_QUARTZ_5401",
+        "GUIDANCE_RATIONALE_OPAL_5402",
+        "GUIDANCE_ALERT_BERYL_5403",
+        "GUIDANCE_MISSING_TOPAZ_5404",
+    ]
+    guidance_allergy_markers = list(markers["allergies"])
+    finish_guidances: list[dict[str, object]] = []
+    completed_guidances: list[object] = []
+
+    def guidance() -> dict[str, object]:
+        """완결 응답에만 고유 표지를 넣고 기록의 알레르기 값을 함께 싣는다."""
+        return {
+            "id": "guidance-synthetic-5401",
+            "patientId": patient["id"],
+            "patientProfileSnapshotId": "snapshot-synthetic-5401",
+            "summary": guidance_markers[0],
+            "considerations": [{
+                "title": "합성 검토 항목",
+                "rationale": guidance_markers[1],
+                "citations": [],
+                "applicability": "CAUTION",
+                "patientFactors": ["allergies"],
+            }],
+            "safetyAlerts": [{
+                "severity": "WARNING",
+                "description": " ".join([guidance_markers[2], *guidance_allergy_markers]),
+                "citations": [],
+            }],
+            "missingInformation": [guidance_markers[3]],
+            "reviewStatus": "DRAFT",
+            "generatedAt": stamp,
+        }
 
     def envelope(data: object, created: bool = False) -> dict[str, object]:
         return {
@@ -199,9 +232,15 @@ def run_turn(scenario: str) -> dict[str, Any]:
         if path == f"{prefix}/finish":
             payload = cast(dict[str, Any], json.loads(request.content))
             finishes.append(payload)
-            return httpx.Response(200, json=envelope(message(
-                payload["status"], payload.get("content", "")
-            )))
+            completed = message(payload["status"], payload.get("content", ""))
+            if payload.get("route") == "COMPOSITE" and payload["status"] == "COMPLETED":
+                completed["guidance"] = guidance()
+            response = httpx.Response(200, json=envelope(completed))
+            # 전송할 응답의 직렬화된 값으로 양성 대조를 보존한다.
+            sent = response.json()["data"]
+            if "guidance" in sent:
+                finish_guidances.append(cast(dict[str, object], sent["guidance"]))
+            return response
         if path == f"{prefix}/guideline-answer":
             completed = message("COMPLETED", "합성 지침 답변")
             completed["answerKind"] = "GUIDELINE_ANSWER"
@@ -263,11 +302,17 @@ def run_turn(scenario: str) -> dict[str, Any]:
             if line.startswith("data: "):
                 event = cast(dict[str, Any], json.loads(line[6:]))
                 events.append(str(event["eventType"]))
+                if event["eventType"] == "answer.completed" and "guidance" in event:
+                    completed_guidances.append(event["guidance"])
         return {
             "status": response.status_code, "events": events, "finishes": finishes,
             "backend_requests": backend_requests, "question": question,
             "question_marker": question_marker, "token": token, "record_markers": markers,
             "answer_marker": answer_marker, "exception_raised": synthesis.raised,
+            "guidance_markers": guidance_markers,
+            "guidance_allergy_markers": guidance_allergy_markers,
+            "finish_guidances": finish_guidances,
+            "completed_guidances": completed_guidances,
         }
     finally:
         langsmith.configure(enabled=None)

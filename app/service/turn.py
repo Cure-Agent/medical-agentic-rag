@@ -13,7 +13,8 @@
     복합  환자 도구 → agent.progress{stage: "patient_loaded"} → 근거 도구 SSE:
           retrieval.started → retrieval.progress* → (evidence.gated가 통과면 answer.started)
           → retrieval.evidence×N → retrieval.completed → answer.delta*(판정 뒤)
-          → [완결] → answer.completed | answer.abstained
+          → [완결: BE가 임상 참고안을 구조화·저장한다] → answer.completed{message, guidance}
+          | answer.abstained
     기타  [완결 ABSTAINED] → answer.abstained          (환자·복합의 라벨 해석 실패도 같다)
 
 - `route`는 실행 경로(`GUIDELINE`·`PATIENT`·`COMPOSITE`·`OTHER`)다 — 분류기 판정이 아니라
@@ -22,9 +23,13 @@
 - `evidence.gated`는 브라우저로 흘리지 않는다. `abstainReason`이 null이면 `answer.started
   {evidenceCount}`(그 이벤트의 `evidenceCount`)로 바꿔 첫 `retrieval.evidence`보다 앞에 보내고,
   사유가 있으면 합성 없이 그 사유로 기권 완결한다.
-- 종결 이벤트는 **완결 응답을 받은 뒤에** 보낸다. `answer.completed{message}`의 `message`는 완결
-  응답 봉투의 `data`이고, `answer.abstained{message, reason, missingInformation: []}`의 `reason`은
+- 종결 이벤트는 **완결 응답을 받은 뒤에** 보낸다. `answer.completed`의 `message`는 완결 응답
+  봉투의 `data`이고, `answer.abstained{message, reason, missingInformation: []}`의 `reason`은
   그 메시지의 `abstainReason` 문장이다.
+- **완결 응답의 `guidance`는 `message`에서 떼어 이벤트의 형제 필드로 올린다** — BE가 참고안을
+  만든 완결에만 그 키가 있다(복합 완료뿐이다. BE docs/specs/54). 참고안이 없으면 이벤트에도
+  키를 만들지 않는다. 에이전트는 참고안을 해석하지 않고 받은 객체를 그대로 싣는다 — 채팅
+  스트림의 `answer.completed{message, guidance}`와 같은 모양이라 FE가 경로를 구분하지 않는다.
 
 **BE 내부 API** (`/api/v1/internal/agent/…`, 헤더는 전부 받은 Cookie 원문 + 받았을 때만 CSRF)
 
@@ -432,7 +437,14 @@ class AgentTurn:
 
     async def _complete(self, body: dict[str, object]) -> None:
         message = await self._finish(body)
-        self._emit({"eventType": "answer.completed", "message": message})
+        # 참고안은 메시지의 형제 필드로 올린다 — BE 채팅 스트림의 `answer.completed`와 같은
+        # 모양이라 FE가 경로를 구분하지 않는다(BE docs/specs/54). 참고안을 만든 완결에만
+        # 키가 있으므로, 없으면 이벤트에도 키를 만들지 않는다
+        guidance = message.pop("guidance", None)
+        event: dict[str, object] = {"eventType": "answer.completed", "message": message}
+        if guidance is not None:
+            event["guidance"] = guidance
+        self._emit(event)
 
     async def _abstain(self, reason: str, *, generation: dict[str, object] | None = None) -> None:
         body: dict[str, object] = {
