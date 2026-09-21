@@ -22,12 +22,16 @@ argument-hint: <spec 번호 (예: 41)>
 2. **AGENT 범위 판별**: 스펙의 수용 기준 중 **`(AGENT)` 라벨이 달린 항목만** 이 레포가 구현한다.
    `(BE)`·`(FE)` 기준은 건드리지 않는다. **라벨이 없거나 이 레포 몫이 모호하면 사람에게 분할을
    확인받는다** — 추측으로 가르지 않는다.
-   > 2026-09-11 기준 BE `.claude/commands/spec.md`의 라벨 규칙은 `(BE)`·`(FE)` 둘뿐이다. `(AGENT)`
-   > 라벨이 없는 스펙이 오면 이 단계에서 멈추는 것이 정상 경로다.
+   > BE `.claude/commands/spec.md`의 라벨 규칙에 `(AGENT)`가 정식으로 있다 — 「`(AGENT)`는
+   > `medical-agentic-rag`다」(2026-09-21 확인). 라벨이 하나도 없는 스펙은 단일 레포 스텝이거나
+   > 라벨 누락이므로, 이 레포 몫을 추측하지 않고 위 문장대로 사람에게 확인받는다.
 3. 스펙이 §링크한 이 레포 `docs/architecture.md` 섹션을 읽는다. **§2(구조와 경계 원칙)·§3(검증 명령)·
    §4(테스트)는 항상 포함**한다.
-   > **형태는 문서가 아니라 코드에서 본다.** API 요청·응답은 `app/api/routes.py`의 Pydantic 모델,
-   > 검색 정책은 `app/agent/graph.py`의 `PRESETS`, 노드 입출력은 `app/agent/state.py`가 진실이다.
+   > **형태는 문서가 아니라 코드에서 본다.** 서비스(운영 이미지)는 요청·응답 모델이
+   > `app/service/routes.py`, SSE 이벤트와 BE 내부 API 호출이 `app/service/turn.py`, 실행 경로 표가
+   > `app/service/routing.py`, 합성·인용이 `app/service/synthesis.py`가 진실이다. 실험 앱은
+   > `app/api/routes.py`의 Pydantic 모델, 검색 정책은 `app/agent/graph.py`의 `PRESETS`, 노드 입출력은
+   > `app/agent/state.py`다.
 4. `git status` clean 확인, `git checkout main && git pull origin main`.
 5. **브랜치 생성**: `"<prefix>/<슬러그>"` → checkout. **이슈를 만들지 않는다**
    (`automation/ship.md` 「워크플로우 전제」 — 이 레포는 PR-퍼스트다).
