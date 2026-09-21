@@ -2,361 +2,372 @@
 
 [English](README.md) | [한국어](README.ko.md)
 
-> **Agentic RAG는 실제로 언제 도움이 되는가?**
->
-> 운영 의료 가이드라인 RAG 시스템에서 가져온 베이스라인 위에서 query decomposition,
-> context expansion, facet-enumeration prompting, iterative retrieval, reranking을
-> 평가한 ablation 연구.
+> **CureAgent의 에이전트 서비스.** 의료인이 보낸 질문 하나를 분류해 맞는 경로를 BE 내부 API로
+> 실행하고, 결과를 SSE로 브라우저에 흘린다.
 
-이 저장소는 [CureAgent](https://github.com/Cure-Agent/cure-agent-be)의 하이브리드
-검색 경로를 이식한 뒤, 제안된 에이전틱 개입을 각각 분리해 운영 시스템에 반영하기 전에
-효과를 평가한다.
+이 저장소에는 두 가지가 있다.
 
-## 연구 질문
+1. **에이전트 서비스** (`app/service/`) — 운영 코드다. 검증을 통과한 `main` 커밋마다 컨테이너
+   이미지를 올리고, [cure-agent-be](https://github.com/Cure-Agent/cure-agent-be)가 그 이미지를
+   당겨 배포한다.
+2. **Agentic RAG ablation 연구** — 이 저장소가 시작한 자리다. 그 판정이 운영 검색 정책을 고정했고,
+   연구 종료 시점의 코드는 `ablation-study` 태그로, 증거는
+   [docs/experiments/](docs/experiments/INDEX.md)에 남아 있다.
+   [기원](#기원-agentic-rag-ablation-연구) 절을 참고한다.
 
-CureAgent의 운영 하이브리드 검색기는 dense retrieval, 문자 n-gram 검색, Reciprocal Rank
-Fusion(RRF)으로 **후보 커버리지 1.000**을 달성했지만 오답은 남아 있었다. 정답을 뒷받침하는
-근거가 이미 후보군에 있다면, 남은 병목은 다음 두 가지인가?
+[docs/architecture.md](docs/architecture.md)가 이 저장소의 설계 문서다. 레포를 넘나드는 공통
+계약(응답 봉투, 에러코드 레지스트리, SSE 이벤트 스키마, 인증)은
+[cure-agent-be/docs/architecture.md](https://github.com/Cure-Agent/cure-agent-be/blob/main/docs/architecture.md)에
+있고, 드리프트를 막기 위해 여기에 복사하지 않는다.
 
-- 특히 다면 질문에서 분해가 도움이 될 수 있는 **질문의 구조**
-- 시스템이 근거가 충분한 시점을 판단할 수 있는가에 해당하는 **검색 종료 판단**
+## 에이전트 서비스
 
-> **현재 결론(2026-08-24):** 현재 평가 설정에서 테스트한 에이전틱 개입은 운영 도입을
-> 정당화할 만큼 일관된 근거를 보이지 않았다. Query decomposition, context 추가,
-> facet-enumeration prompting, iterative retrieval 모두 전면 도입 기준을 충족하지 못했다.
-> 가장 큰 탐색적 효과는 reranking에서 나왔고(complex 질문 정답률 0.17 → 0.50,
-> **k=1**), 운영은 더 단순한 단일 질의 검색 경로를 유지한다. 이는 Agentic RAG가 절대
-> 도움이 되지 않는다는 근거가 아니라, 현재 표본·불확실성·기전·비용을 바탕으로 내린
-> 결정이다. 자세한 내용은 [실험 기록](docs/experiments/INDEX.md)을 참고한다.
+### API 표면
 
-## 운영 기반 베이스라인
+| 엔드포인트 | 역할 |
+|---|---|
+| `GET /api/v1/agent/healthz` | 프로세스 생존만 본다. BE를 부르지 않아 BE 장애가 에이전트 재시작·배포 롤백으로 번지지 않는다. |
+| `GET /api/v1/agent/me` | 받은 `Cookie`·CSRF 헤더를 그대로 BE `GET /api/v1/auth/me`에 넘겨 그 판정을 바꾸지 않고 돌려준다. 성공 응답에는 `clinicianId`·`clinicId`만 싣는다. |
+| `POST /api/v1/agent/conversations/{conversationId}/messages/stream` | 에이전트 턴 하나를 SSE로 흘린다. |
+| `GET /metrics` | Prometheus 수집 표면. 라우터 접두사(`/api/v1/agent`) **밖**에 일부러 두었다 — nginx가 그 접두사만 에이전트로 보내므로 차단 규칙을 더하지 않아도 외부에서 닿지 않는다. |
 
-비교 베이스라인은 CureAgent의 검색 정책을 재현한다.
+브라우저에게는 `/api/v1` 하나가 API 표면이다. 운영 nginx가 `/api/v1/agent/` 아래만 이 서비스로
+보내고 나머지는 BE로 보낸다. 에이전트는 BE를 nginx 밖(`http://app:3000`)에서 부르며, 에이전트만
+쓰는 내부 API(`/api/v1/internal/agent/…`)는 운영 nginx가 404로 막고 BE OpenAPI에서도 빠진다.
 
-1. 원 질문을 임베딩하고 `pgvector` cosine distance로 dense retrieval을 수행한다.
-2. `pg_trgm` `word_similarity`로 lexical retrieval을 수행한다.
-3. 절단하지 않은 합집합을 RRF로 융합한다.
-4. 전체 후보군을 LLM으로 reranking한 뒤 상위 5개 chunk를 선택한다.
-5. 검색 게이트와 생성 게이트를 각각 적용한다.
+### 스트림을 열기 전
 
-| 구성 요소 | 설정 | 이 설정을 고정한 이유 |
-|---|---|---|
-| Dense arm | `text-embedding-3-small`, 1,536차원; `pgvector` cosine distance | 코퍼스와 질의가 같은 임베딩 공간을 사용해야 한다. |
-| Lexical arm | BM25가 아닌 `pg_trgm` `word_similarity` | 코퍼스의 공백 소실로 어절 토큰화가 불안정하다. 문자 n-gram은 조사·붙임과 띄어쓰기에 강건하다. |
-| RRF | 절단하지 않은 합집합에 K=60 | top-30 절단 시 후보 커버리지는 0.978, 합집합에서는 1.000으로 측정됐다. |
-| Lexical 동점 처리 | `ORDER BY similarity DESC, id ASC` | top-30 경계에서 동점 72건이 관측됐다. 2차 키를 두어 검색을 결정적으로 만든다. |
-| 거리 게이트 | Cosine distance 0.48 | 두 가지 paraphrase 문체로 만든 118문항에서 손실 0건을 관측했다. |
-| LLM reranker | 후보 무절단 → listwise reranking → top 5; 300자 발췌 | 운영 평가에서 Recall@5가 0.780에서 0.983으로 향상됐다. |
-| Rerank 점수 게이트 | Top-1 관련도 cutoff | 과거 `rerank` preset은 3.5를 사용한다. 운영 parity인 `prod_rerank`는 [229문항 × 2회 cutoff sweep](https://github.com/Cure-Agent/cure-agent-be/blob/dev/docs/rag-eval/2026-08-25-cut-sweep-verdict.md) 이후 9를 사용한다. 역할은 답변가능성 판정이 아니라 생성 비용 통제다. |
+LLM을 부르기 전에 셋을 거른다. 각 실패는 §10.1 봉투다.
 
-처음에는 query understanding을 분리해 측정하려고 reranking을 제외했다. 이는 설계 오류였다.
-운영에는 이미 reranker가 있으므로, reranker가 없는 베이스라인에서 측정한 이득으로는 운영
-변경을 정당화할 수 없다. Reranking은 에이전틱 개입이 해결하려던 다면 질문 오류 중 상당수를
-이미 해결하고 있었다.
+1. **본문 검증** — `content` 1~4000자, `clientRequestId` 1~100자, 선택인 `responseLang`은
+   `ko`|`en`이다. 어기면 422 `VALIDATION_FAILED`. 대화 id가 BE id 모양이 아니면 BE에 묻지 않고
+   404 `NOT_FOUND`다.
+2. **access 토큰 선검사** — `access_token` 쿠키를 서명 검증 없이 JWT로 읽어 `exp`·`iat`만 본다.
+   남은 수명이 실행 상한(150초)보다 짧으면 401 `AUTH_TOKEN_EXPIRED`이고 BE를 부르지 않는다.
+   **전체** 수명이 상한 이하인 토큰은 검사하지 않는다 — 새로 받아도 못 넘으니 FE가 refresh 루프에
+   빠진다.
+3. **수락** — `POST …/internal/agent/conversations/{id}/turns`. 이 호출 하나가 인증·클리닉
+   스코프·CSRF·중복 판정을 겸하므로 분류기보다 **앞**에 둔다 — 비로그인 요청이 LLM 비용을 태우지
+   못한다. 201이 아닌 응답은 그대로 중계하고, 응답을 못 받으면 502 `AGENT_BACKEND_UNAVAILABLE`이다.
 
-## 에이전틱 파이프라인
+수락이 준 `assistantMessageId`가 끊김 복구의 기준점이다.
+
+### 분류와 실행 경로 표
+
+**라벨 차원은 코드가, 의미 차원은 LLM이 쥔다.** 분류기는 strict JSON 스키마로 `{route,
+patient_labels}`만 내고, 실제 경로는 순수 함수(`routing.plan_route`)가 정한다. 라벨 규칙을
+프롬프트로 옮긴 구성은 분류가 오히려 나빠졌으므로 규칙은 표에 남는다.
+
+| 분류기 route | 라벨 | 실행 경로 | 결말 |
+|---|---|---|---|
+| `GUIDELINE` | 0 | 지침 | BE 지침 도구 |
+| `GUIDELINE` | 1 | 복합 | |
+| `PATIENT` | 1 | 환자 | 환자 도구가 `NOT_FOUND`·`AMBIGUOUS`면 ABSTAINED `patient_unresolved` |
+| `PATIENT` | 0 | 환자 | 도구 없이 `patient_unresolved`로 기권 |
+| `COMPOSITE` | 1 | 복합 | 환자 해석 실패는 위와 같다 |
+| `COMPOSITE` | 0 | 지침 | |
+| 무엇이든 | 2 이상 | 기타 | 도구 없이 `out_of_scope`로 기권 |
+| `OTHER` | — | 기타 | 도구 없이 `out_of_scope`로 기권 |
+
+라벨은 앞뒤 공백을 지우고 빈 값을 버린 뒤 대소문자를 무시하고 서로 다른 것만 센다. 특정 환자는
+질문에 적힌 케이스 라벨로만 가리킨다.
+
+### 네 갈래
 
 ```text
-질문
-  │
-  ▼
-1–4개 하위 질의로 분해
-  │
-  ▼
-하이브리드 검색 → RRF → 선택적 Rerank
-  │
-  ▼
-근거 평가
-  │
-  ├── 충분 ───────────────────→ 답변
-  │
-  └── 부족
-         │
-         ├── 예산 남음 ───────→ 후속 질의 생성
-         │                            │
-         │                            └──→ 재검색
-         │
-         └── 예산 소진 ───────→ 기권
+공통  message.accepted → 분류 → agent.progress{stage: "routed", route}
+지침  지침 도구 SSE의 이벤트를 받은 순서·내용 그대로 흘린다 — 완결을 부르지 않는다
+환자  환자 도구 → agent.progress{patient_loaded} → answer.delta*
+        → [완결 COMPLETED] → answer.completed
+복합  환자 도구 → 근거 도구: retrieval.started → retrieval.progress*
+        → (게이트를 통과하면 answer.started) → retrieval.evidence×N
+        → retrieval.completed → answer.delta*(판정 뒤)
+        → [완결: BE가 임상 참고안을 구조화·저장한다]
+        → answer.completed{message, guidance} | answer.abstained
+기타  [완결 ABSTAINED] → answer.abstained
 ```
 
-위 그림은 `full` 경로다. Rerank가 활성화된 변형은 검색 단계를 **후보 무절단 → rerank →
-top-k → 점수 게이트**로 바꾼다. Answer 노드는 생성 게이트도 겸한다. 검색 근거로 답할 수
-없으면 구조화된 `insufficient_evidence` 신호를 내보내고 기권 경로로 보낸다.
+- **복합의 판정은 답을 쓰는 쪽이 한다.** 근거 도구는 관련도 게이트에서 멈추고, 에이전트가 원문
+  근거와 환자 기록으로 생성과 답변가능성 판정을 한 번에 한다. 판정 필드가 닫히기 전에는 델타를
+  흘리지 않는다(`synthesis.VerdictFirstParser`).
+- **참고안은 만들지 않고 흘린다.** BE 완결이 임상 참고안을 구조화·검증해 답변과 같은 트랜잭션에
+  세우고, 에이전트는 완결 응답의 `guidance`를 `message`에서 떼어
+  `answer.completed{message, guidance}`로 보낸다. 참고안을 만든 완결에만 그 키가 있으므로 없으면
+  이벤트에도 키를 만들지 않는다.
+- 인용은 최종 답변에 남은 마커 `[n]`을 n번째 `retrieval.evidence` 프레임의 id에 맺은 것이다.
+- 종결 이벤트는 완결 응답을 받은 **뒤에** 보낸다. 기권은 정상 종료 상태다.
 
-- **재검색 예산은 LLM이 아니라 코드가 관리한다.** `app/agent/graph.py`의 routing 함수는
-  순수 함수이며 모델 호출 없이 단위 테스트한다.
-- 근거는 `chunk_id`를 key로 하는 dictionary에 저장해 검색 라운드 사이의 중복을 제거한다.
-- **기권은 정상적인 종료 상태다.** 의료 환경에서는 근거 없는 답을 생성하는 것보다 어떤
-  근거가 부족한지 설명하는 편이 낫다.
-- **두 게이트는 서로 다른 질문에 답한다.** 검색 게이트는 *관련도*를 추정해 불필요한 생성
-  비용을 피하고, 생성 게이트는 *답변가능성*을 추정한다. 평가에서는 관련도 10/10인 근거로도
-  질문에 답할 수 없는 사례가 관측됐다.
-- LangGraph 1.x는 graph orchestration을, LangChain 1.x는 structured output과 model
-  abstraction을 담당한다.
+### BE 내부 API
 
-## 실험
+모든 호출에 받은 `Cookie` 원문과, **받았을 때만** `X-CSRF-Protection`을 싣는다. 그 밖의 요청
+헤더는 넘기지 않으며, 에이전트는 자격을 스스로 만들지 않는다.
 
-완료된 각 실험에는 [docs/experiments/](docs/experiments/INDEX.md)의 불변 증거 문서가 있다.
-관측 숫자는 사후에 다시 쓰지 않는다. 후속 결과가 나오면 `superseded` 배너를, 사실 또는
-통계 오류를 교정하면 `erratum` 배너를 추가한다. 평가가 어떻게 잘못될 수 있는지 보여주는
-증거로서 실패한 비교도 보존한다.
-
-현재 결정은 **complex 질문 12개 × pipeline 실행 5회**를 근거로 한다. `/`로 구분한 값은
-같은 pipeline 출력에 대한 `grade-strict-v1` judge 2회 결과이고, retrieval loop 실험은
-한 번만 채점했다.
-
-| 개입 | 관측 효과 | 결정 |
+| 호출 | 경로 (`POST …/internal/agent/…`) | 본문 |
 |---|---|---|
-| Query decomposition, 변형 B | 정답률 **+0.100 / +0.117**, 95% CI [−0.150, +0.350] / [−0.117, +0.367]; 두 judge 실행 모두 부호 4:3. 검색층 facet coverage **+0.022**, 95% CI [−0.075, +0.144]. | 전면 도입하지 않는다. 문항별 효과가 −0.60에서 +0.80까지 분포했고 검색층 기전도 불확실하다. |
-| Context 증량, top 5 → top 11 | 정답률 **−0.083 / −0.083**, 95% CI [−0.267, +0.067]. | 재현 가능한 이득이 없다. 검색층 실패와 생성층 실패를 제거하지 않고 서로 맞바꿨다. |
-| Facet-enumeration answer prompt | 정답률 **−0.067 / −0.083**, 95% CI [−0.183, +0.033] / [−0.200, +0.017]; 부호 0:4 / 0:5. | 관측된 이득이 없고, 방향이 오히려 불리할 수 있다. |
-| Iterative retrieval, `rerank_full` | 정답률 **+0.050**; 부호 2:2, 95% CI [−0.117, +0.250]. 60행 중 12행만 loop에 진입했고 이득 대부분이 문항 1개에서 나왔다. | 현재 근거와 비용 조건에서는 loop를 추가하지 않는다. |
+| 지침 도구 | `turns/{assistantMessageId}/guideline-answer` | `{classifierVersion}` |
+| 환자 도구 | `turns/{assistantMessageId}/patient` | `{caseLabel}` |
+| 근거 도구 | `turns/{assistantMessageId}/guideline-evidence` | `{query}` |
+| 완결 | `turns/{assistantMessageId}/finish` | `{status, route?, classifierVersion, …}` |
 
-교정 전 top-5 → top-11 추정값은 0.000이었다. 교정된 두 judge 실행은 모두 −0.083을
-산출했으며, 도입하지 않는다는 결정은 바뀌지 않았다.
+**턴을 닫는 주체는 경로마다 하나다.** 지침 도구는 채팅 파이프라인으로 답변 저장까지 하므로 그
+경로에서는 에이전트가 완결을 부르지 않는다 — 실패·끊김에도 마찬가지다. 나머지 경로는 에이전트의
+완결이 닫는다: 실패는 `FAILED`, 클라이언트 끊김은 `CANCELLED`다. 근거 도구는 턴 상태를 바꾸지
+않는다.
 
-통계적 유의성만으로 도입 여부를 결정하지 않는다. 불일치쌍이 5개라면 5:0이어도 양측
-부호검정 p-value의 최솟값은 0.0625다. `n=12` 설계가 원리적으로 유의할 수 없는 것은
-아니지만, 여기서 관측한 부호·0을 포함하는 신뢰구간·문항별 이질성·기전·비용은 전면 도입을
-뒷받침하지 않는다.
+시간 상한: JSON 호출 5초, 내부 SSE와 완결은 connect 5초·read 30초(BE가 완결 안에서 참고안을
+구조화한다), 실행 상한은 요청 도착부터 150초, SSE 하트비트 15초, LLM 첫 응답 45초다.
 
-## 핵심 결과
+### 추적
 
-1. **Query decomposition은 일관된 이득을 보이지 않았다.** 일부 질문 형태는 크게 개선됐지만
-   다른 질문은 악화됐고, 평균은 이 이질성을 가렸다.
-2. **검색 context 증량은 정답률을 개선하지 않았다.** Chunk를 늘리면 실패 위치가 달라졌지만
-   실패를 일관되게 제거하지 못했다.
-3. **Iterative retrieval의 이득은 제한적이었다.** Loop에 진입한 문항은 3개뿐이었고,
-   관측 이득 대부분을 문항 1개가 만들었다.
-4. **Reranking에서 가장 큰 관측 개선이 나왔다.** 0.17 → 0.50은 폐기된 k=1 ablation에서
-   나온 탐색적 결과지만, 운영 parity 베이스라인의 중요성을 드러냈다.
-5. **관련도와 답변가능성에는 별도 게이트가 필요하다.** 검색 점수는 생성 비용 통제에는
-   유용하지만, 근거가 다면 질문에 답하기에 충분한지는 판단할 수 없다.
+LangSmith 추적은 `AGENT_TRACING_ENABLED=true`일 때만 켜진다. SDK 환경변수는 한쪽 네임스페이스의
+`true`로 켜지고 `false`로 끌 수 없어서, 그대로 두면 `.env` 한 줄이 조용히 추적을 켠다. 스위치는
+기동 때 한 번 고정한다.
 
-이 결과는 현재 검색기가 충분하다는 의미가 **아니다**. 한 통제 비교에서 교정된 complex 질문
-정답률은 0.600이었고, `cpx-010`은 테스트한 모든 구성에서 5회 모두 실패했다.
+턴이 환자·복합으로 정해진 뒤는 실행을 골라서가 아니라 **분기 전체**를 숨김 클라이언트로 감싼다 —
+환자 도구 출력만 숨기면 같은 기록이 합성 프롬프트로 다시 실린다. 프로젝트명은 턴마다 다시 건다.
+`langsmith.configure(project_name=…)`는 호출한 태스크의 contextvar에만 남아, lifespan에서 건 값이
+요청 태스크로 이어지지 않았다 — 운영에서 분류기 실행이 `default` 프로젝트로 갔다.
 
-Retrieval loop는 일부 실행에서만 성공한 흔들림 문항을 4개에서 2개로 줄이기도 했다. 이는
-평균 정답률과 별개의 관측이며 k=5 실험 한 번에서 나온 값이므로, 주장이라기보다 재현할
-대상으로 남겨 둔다.
+## 서비스 실행
 
-## 평가 방법론
-
-전체 데이터셋은 simple 12개, complex 12개, 의도적으로 근거가 부족한 insufficient 12개로
-총 36문항이다. 올바른 동작은 category마다 다르다. 답변 가능한 질문은 기권하지 않고 필요한
-key point를 모두 충족해야 하며, insufficient 질문은 기권해야 한다.
-
-주요 반복 ablation은 다음을 사용한다.
-
-- 구성별 독립 pipeline 실행 5회
-- 명시적인 권고등급 대조를 포함한 엄격한 key-point 채점
-- 문항 단위 정답률과 key-point coverage
-- 검색 실패와 생성 실패를 구분하는 검색층 facet coverage
-- 문항별 paired 성공률, 문항과 실행에 대한 2단 bootstrap, 양측 exact sign test
-- code commit(`code_version`), judge ruleset, dataset, preset, model, 반복 횟수,
-  API 오류 수를 포함한 결과 metadata
-
-평가기 자체도 두 번 측정했다. 639개 key-point 판정 중 judge 실행 사이에 바뀐 것은 4개
-(0.6%)였고 기권 판정은 하나도 바뀌지 않았다. 덕분에 측정 교정과 evaluator noise를 구분할
-수 있었다.
-
-## RAG 시스템 평가에서 배운 것
-
-가장 값진 결과는 승리한 구성이 아니다. 측정이 어떻게 실패했고 그 실패가 의사결정을 어떻게
-바꿨는지 남긴 기록이다.
-
-1. **실행 1회는 실험이 아니다.** 최초 통제 점수는 0.75였지만 5회 추정값은 0.600이었다.
-   12문항 중 4문항이 실행마다 결과가 바뀌었다. 비결정성은 생성뿐 아니라 reranker부터
-   시작됐다. 같은 질문과 후보에서도 top-five 집합이 36건 중 21건에서 달라졌다.
-2. **Commit hash가 없는 비교는 무효일 수 있다.** 첫 ablation의 8개 행이 서로 다른 code
-   epoch에서 나왔다. 오류를 재구성하려면 file timestamp와 trace fingerprint가 필요했다.
-   이제 `run_eval`은 모든 결과 행에 `code_version`을 기록한다.
-3. **정답률만으로는 검색 실패와 생성 실패를 구분할 수 없다.** 어디에 개입할지 결정하려면
-   key-point 단위의 supporting-chunk coverage를 별도로 측정해야 한다.
-4. **통제 구성은 조용히 깨질 수 있다.** Reranker 요청 개수가 고정돼 context-size 통제군이
-   운영 통제군과 같아진 적이 있다. Prompt flag가 node까지 전달되지 않아 두 구성이 같은
-   prompt로 실행된 적도 있다. 두 경로 모두 이제 test로 보호한다.
-5. **Evaluator도 반복 측정해야 한다.** 두 번째 judge 실행이 없었다면 +0.217에서
-   +0.100 / +0.117로 바뀐 값을 gold label과 채점 로직의 교정이 아니라 noise로 잘못
-   해석할 수 있었다.
-6. **Prompt에 규칙을 적는다고 규칙이 강제되지는 않는다.** 권고등급 규칙은 처음부터 있었지만
-   한 key point에서 10/10번 위반됐다. 이제 evaluator가 등급을 먼저 추출하고 코드에서
-   결정적으로 대조한다(`evals/judge.py::reconcile_grade`).
-7. **LLM labeler는 내용 대신 형식을 맞출 수 있다.** 발췌문이 앞부분의 주어를 누락했을 때
-   반복되는 권고안 template 때문에 다른 중재의 근거를 선택했다. 33개 key point 중 5개가
-   이 방식으로 오라벨됐다.
-
-## 재현성
-
-저장소에는 직접 작성한 평가 질문과 기대 key point가 포함되지만, 생성 답변·검색 chunk·원문
-document ID·vector database는 포함하지 않는다. 이런 자료를 공개하지 않고도 aggregate 효과를
-독립적으로 재현할 수 있다.
-
-- [익명화된 paired binary score](docs/experiments/evidence/paired_scores.csv)는 `case_01`과
-  같은 가명 ID를 사용하고 5회 성공값만 포함한다.
-- [검산 스크립트](scripts/verify_public_results.py)는 Python 표준 라이브러리만으로 평균 차이,
-  2단 bootstrap 신뢰구간, 양측 부호검정을 다시 계산한다.
+Python 3.12+와 [uv](https://docs.astral.sh/uv/)가 필요하다. 의존성은 `uv.lock`이 정하고, CI와
+이미지가 같은 잠금에서 설치한다.
 
 ```bash
-python scripts/verify_public_results.py
+uv sync
+BE_ORIGIN=http://localhost:3000 OPENAI_API_KEY=sk-... \
+  .venv/bin/uvicorn app.service.main:create_app --factory --port 8000
 ```
 
-`results/` 아래의 실험 출력은 의도적으로 gitignore되며 덮어쓸 수 있다. 관측값은 실험 문서와
-익명화된 점수 산출물에 고정한다.
+`ServiceSettings`는 **프로세스 환경변수만 읽는다** — `BE_ORIGIN`·`AGENT_TRACING_ENABLED`·
+`OPENAI_API_KEY`. `.env`는 읽지 않는다: 파일 한 줄이 BE 주소나 추적 스위치를 조용히 바꾸지 못하게
+한다. 키가 없어도 앱은 뜬다 — `healthz`·`/metrics`는 LLM과 무관하고, 스트림은 수락 뒤
+`LLM_UNAVAILABLE`로 끝난다.
 
-### 한계
+분류기와 합성의 기본 모델은 BE와 같은 `gpt-5.4-mini`다.
 
-- 반복 개입 결과는 complex 질문 12개를 사용한다. 한 문항이 정답률을 8.3 percentage point
-  움직이며, 보고한 모든 개입의 신뢰구간은 0을 포함한다.
-- Key-point 근거 label 11개는 LLM 보조 workflow로 검토했지만 최종 사람 검수는 아직 받지 않았다.
-- 엄격한 권고등급 규칙을 도입한 뒤 simple 질문은 재채점하지 않았다.
-- `cpx-010`은 모든 구성과 실행에서 실패했으며 원인은 아직 설명되지 않았다.
-- Iterative path는 설계상 rerank 점수 게이트를 우회한다. 점수가 8–10인 complex set에는
-  영향을 주지 않았지만 insufficient 질문에서의 비용은 측정하지 않았다.
+## 검증 명령
 
-## 실험 실행
+검증 명령의 단일 원천은 `Makefile`이다. CI(`.github/workflows/ci.yml`)와 SDD
+하네스(`automation/*.md`)가 같은 타깃을 부른다.
 
-Python 3.12+와 `pgvector`, `pg_trgm`을 설치한 PostgreSQL database가 필요하다. 코퍼스는
-`hybrid_probe` scratch database에 적재한 운영 데이터의 read-only export를 사용한다.
+| 명령 | 내용 | CI 잡 |
+|---|---|---|
+| `make lint` | `ruff check` | `lint` |
+| `make typecheck` | pyright (standard 모드, Python 3.12, `app`·`evals`·`tests`·`scripts`) | `typecheck` |
+| `make test` | pytest (`tests/e2e/` 제외) | `test` |
+| `make test-e2e` | pytest `tests/e2e/` — 컨테이너 테스트, Docker 필요 | `test-e2e` |
+| `make build` | 서비스 이미지 로컬 빌드 | — |
+| — | gitleaks 히스토리 시크릿 스캔 | `gitleaks` |
+
+단위 테스트는 LLM·임베딩·DB 없이 돈다. 외부 경계는 가짜로 꽂는다 — BE 호출은 요청을 기록하는
+`httpx.MockTransport`로, 분류기·합성 LLM은 LangChain 가짜 채팅 모델로, 실행 상한과 하트비트 주기도
+주입한다(`create_app(backend_transport=…, classifier_model=…, synthesis_model=…)`). CI 러너에는
+`.env`가 없으므로 실제 경계로 새는 테스트는 거기서 드러난다.
+
+여기서 모자란 두 부류가 있다. 프로세스 전역을 바꾸는 설정은 자식 프로세스에서 판정한다 —
+LangSmith는 환경변수 조회를 캐시하고 `configure`가 프로세스 전역을 바꾼다. 추적 숨김은 프로세스를
+떠난 바이트로 판정하고(캡처 서버), 「없다」 단언은 같은 캡처의 양성 대조와 짝짓는다. 스트림 도중의
+행동(판정 전 델타 없음, 끊김 `CANCELLED`)은 ASGI를 직접 구동한다 — `TestClient`는 앱 호출이 끝날
+때까지 응답을 버퍼링한다.
+
+## 배포
+
+`main` push → 검증 잡 전부 통과 → `image` 잡이
+`ghcr.io/cure-agent/medical-agentic-rag`를 `linux/amd64`로 빌드해 `latest`와 실행 번호로 올린다.
+깨진 `latest`는 BE 배포를 실패로 끝내므로 이 잡은 다른 잡 전부에 `needs`로 걸린다.
+
+**서버 배포는 BE가 맡는다.** 이 레포의 파이프라인은 `main` 머지에서 끝나고 cure-agent-be가 올라간
+이미지를 당겨 간다. 이미지는 `uv.lock`에서 `--no-dev`로 설치하고, `app/service`만 싣고(실험
+코드·psycopg 검색 경로는 싣지 않는다), 비-root로 돌며, 추적 변수를 ENV로 박지 않는다.
+
+## 에이전트 평가
+
+아래 실행은 실제 모델을 부르고 gitignore된 `results/`에 남는다.
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-cp .env.example .env  # OPENAI_API_KEY와 DATABASE_URL 설정
+.venv/bin/python scripts/smoke_llm.py           # 운영 코드 경로 그대로 실호출 4건
+.venv/bin/python -m evals.run_routing           # 실행 경로 정확도, 303문항 × 3회
+.venv/bin/python -m evals.run_synthesis         # 합성 생성 + LLM 심판
+```
 
-pytest
-uvicorn app.main:app --reload
+- `scripts/smoke_llm.py`는 가짜 채팅 모델로 볼 수 없는 것만 본다 — `gpt-5.4-mini`가 strict
+  `response_format` 바인딩을 받는가, 스트림 끝 usage가 실제로 오는가, 손으로 짠 증분 파서가 실제
+  청크 경계에서 버티는가.
+- `evals/routing/`이 고정된 라우팅 평가셋이다 — 경계 문항 65개, FE 데모 질의문 9개, BE의 229문항
+  평가셋. 채점 기준은 분류기 판정 원문이 아니라 `plan_route`를 거친 **실행 경로**다. 코드가
+  보증하는 것이 그것이다.
+- `evals/synthesis/`에는 합성 환자 기록 12건, 환자 경로 질문 36개, 코퍼스의 실제 권고를 근거로 박은
+  복합 문항 40개(그중 8건은 기권해야 한다)가 있다. 생성은 서비스 함수를 그대로 쓴다.
+
+수치는 이 문서에 적지 않는다 — `results/`는 gitignore이고 덮어쓰며, 합성 심판의 거짓 양성이
+그대로 믿기에는 많다(쓰기 전에 사람이 본다).
+
+## 기원: Agentic RAG ablation 연구
+
+이 저장소는 **Agentic RAG가 실제로 언제 도움이 되는가**를 묻는 ablation 연구로 시작했다. CureAgent의
+하이브리드 검색 경로를 이식한 뒤, 제안된 에이전틱 개입을 각각 분리해 운영에 닿기 전에 평가했다.
+
+> **판정(2026-08-24):** 테스트한 개입은 어느 것도 전면 도입 기준을 충족하지 못했고, 운영 검색 경로는
+> 현행 유지다 — 원 질문 1개 → 하이브리드 → RRF 무절단 → LLM 리랭커 → top-5 → 점수 게이트. 이는
+> Agentic RAG가 절대 도움이 되지 않는다는 근거가 아니라, 관측된 표본·불확실성·기전·비용을 바탕으로
+> 내린 결정이다.
+
+판정은 **complex 12문항 × 5회 실행**에 근거한다. `/`로 나뉜 값은 같은 출력에 대한 두 번의 채점이다.
+
+| 개입 | 관측 효과 | 판정 |
+|---|---|---|
+| 질의 분해(변형 B) | 정답률 **+0.100 / +0.117**, 95% CI [−0.150, +0.350] / [−0.117, +0.367]; 부호 4:3 | 도입 안 함 — 문항별 효과가 −0.60~+0.80이고 검색층 기전이 불명확했다 |
+| 컨텍스트 증량, top 5 → top 11 | 정답률 **−0.083 / −0.083**, 95% CI [−0.267, +0.067] | 재현되는 이득 없음. 실패를 없애지 않고 옮겼다 |
+| 축 열거 답변 프롬프트 | 정답률 **−0.067 / −0.083**; 부호 0:4 / 0:5 | 이득 없음, 방향이 불리할 수 있다 |
+| 반복 검색(`rerank_full`) | 정답률 **+0.050**; 부호 2:2, 95% CI [−0.117, +0.250]; 60행 중 12행만 루프에 들어갔다 | 이 근거와 비용으로는 도입 안 함 |
+
+가장 큰 관측 개선은 **리랭킹**에서 나왔지만(complex 정답률 0.17 → 0.50) 폐기된 k=1 ablation에서 온
+탐색적 수치다. 그 값은 오히려 설계 오류를 드러낸 데 있다 — query understanding을 분리하려고
+리랭킹을 제외했는데, 운영에는 이미 리랭커가 있으므로 리랭커 없는 베이스라인에서 잰 이득으로는 운영
+변경을 정당화할 수 없다.
+
+**관련도와 답변가능성은 다른 게이트를 쓴다.** 검색 점수는 생성 비용을 통제할 뿐, 근거가 다면 질문에
+답할 수 있는지는 정하지 못한다. 관련도 10/10을 받고도 질문에 답하지 못하는 근거를 실제로 관측했다.
+위 복합 경로가 답을 쓰는 자리에서 답변가능성을 판정하는 이유가 이것이다.
+
+### 측정이 가르쳐 준 것
+
+끝난 실험마다 [docs/experiments/](docs/experiments/INDEX.md)에 불변 문서가 있다. 관측 숫자는 고치지
+않고, 뒤집히면 이전 문서에 `superseded` 배너를, 사실·통계 오류는 `erratum` 배너를 단다. 실패한
+비교도 「평가가 어떻게 틀어지는가」의 증거로 남긴다.
+
+1. **1회 실행은 실험이 아니다.** 첫 통제군 점수는 0.75였고 5회 추정은 0.600이었다. 비결정성은 생성이
+   아니라 리랭커에서 시작했다 — 같은 입력에 top-5 집합이 36건 중 21건 달라졌다.
+2. **커밋 해시 없는 비교는 무효일 수 있다.** 첫 ablation의 8행이 서로 다른 코드 epoch에서 나왔다.
+   `run_eval`은 이제 모든 행에 `code_version`을 기록한다.
+3. **정답률만으로는 검색 실패와 생성 실패를 가르지 못한다.** 근거 청크 커버리지를 key point 단위로
+   따로 재야 한다.
+4. **통제군은 조용히 무너진다.** 컨텍스트 크기 통제군이 운영 통제군으로 붕괴한 적이 있고, 프롬프트
+   플래그가 노드에 닿지 못한 적도 있다. 두 경로 모두 지금은 테스트가 잠근다.
+5. **채점자도 반복해야 한다.** 639개 key point 판정 중 두 채점 사이에 4건(0.6%)이 바뀌고 기권 판정은
+   하나도 바뀌지 않았다 — 그래서 측정 교정을 채점자 노이즈와 구분할 수 있었다.
+6. **프롬프트에 규칙을 쓴다고 지켜지지 않는다.** 권고 등급 규칙이 한 key point에서 10/10 위반됐다.
+   지금은 등급을 먼저 추출해 코드가 결정론적으로 조정한다(`evals/judge.py::reconcile_grade`).
+7. **LLM 라벨러는 내용 대신 형식을 맞춘다.** 반복되는 권고 템플릿 때문에, 발췌에서 주어가 빠지면
+   라벨러가 다른 개입의 근거를 골랐다 — 33개 key point 중 5개가 그렇게 오라벨됐다.
+
+통계적 유의성을 단독 기준으로 쓰지 않았다. 불일치 쌍이 5개면 5:0이어도 양측 부호검정 p의 최솟값이
+0.0625다. 관측된 부호 수, 0을 포함하는 CI, 문항별 이질성, 기전, 비용을 함께 보고 전면 도입을 하지
+않았다. `cpx-010`은 모든 구성·모든 실행에서 실패했고 아직 설명되지 않았다. 한계 전문은
+[docs/experiments/INDEX.md](docs/experiments/INDEX.md)에 있다.
+
+### 연구 재현
+
+이 저장소는 작성한 질문과 기대 key point는 공개하지만 생성된 답변·검색된 청크·원문 문서 id·벡터
+DB는 공개하지 않는다. 그것 없이도 집계 효과는 재현된다.
+
+```bash
+python scripts/verify_public_results.py   # 표준 라이브러리만 쓴다
+```
+
+[익명화된 짝 점수](docs/experiments/evidence/paired_scores.csv)에서 평균 차이, 2단 부트스트랩 CI,
+양측 부호검정을 다시 계산한다.
+
+ablation을 직접 돌리려면 연구 환경이 필요하다 — `pgvector`·`pg_trgm`을 올린 PostgreSQL의
+`hybrid_probe` 스크래치 DB에 코퍼스 read-only 익스포트를 적재하고, `.env`를 채운다(`.env.example`
+참고). 실험 앱은 서비스 앱과 별개다.
+
+```bash
+.venv/bin/uvicorn app.main:app --reload
 # POST /ask {"question": "...", "preset": "prod_rerank"}
-```
 
-`prod_rerank`는 기본값이며 현재 운영 검색 정책과 동일하다. 원 질문 1개, top 5 chunk,
-rerank cutoff 9를 사용한다. 과거 `rerank` preset은 2026-08-23과 2026-08-24 결과를
-재현할 수 있도록 cutoff 3.5를 유지한다.
-
-Ablation 1회를 실행한다.
-
-```bash
-python -m evals.run_eval \
-  --presets rerank,rerank_facets \
-  --categories complex \
-  --out results/run1
-python -m evals.judge --results results/run1
+python -m evals.run_eval --presets rerank,rerank_facets --categories complex --out results/run1
+python -m evals.judge   --results results/run1
 python -m evals.metrics --results results/run1
 ```
 
-Paired comparison을 5회 반복한다.
+`prod_rerank`가 기본값이고 운영과 같다 — 원 질문 1개, top 5 청크, rerank cutoff 9. 과거 `rerank`
+preset은 2026-08-23·2026-08-24 결과를 재현할 수 있도록 cutoff 3.5를 유지한다.
+
+5회 반복 짝 비교, 사후 cutoff sweep, 검색층 facet 커버리지:
 
 ```bash
 for i in 1 2 3 4 5; do
-  python -m evals.run_eval \
-    --presets <A>,<B> \
-    --categories complex \
-    --out results/rep$i
+  python -m evals.run_eval --presets <A>,<B> --categories complex --out results/rep$i
   python -m evals.judge --results results/rep$i
 done
-python -m evals.repeat_metrics \
-  --runs results/rep{1,2,3,4,5} \
-  --a <A> \
-  --b <B>
-```
+python -m evals.repeat_metrics --runs results/rep{1,2,3,4,5} --a <A> --b <B>
 
-낮은 cutoff로 실행한 결과에서 rerank cutoff를 sweep한다.
+python -m evals.cut_sweep --runs results/cut{1,2,3,4,5} --preset rerank_cut05 --run-cut 0.5
 
-```bash
-# 실행 cutoff는 재구성하려는 범위의 최솟값보다 낮아야 한다.
-for i in 1 2 3 4 5; do
-  python -m evals.run_eval --presets rerank_cut05 --out results/cut$i
-  python -m evals.judge --results results/cut$i
-done
-python -m evals.cut_sweep \
-  --runs results/cut{1,2,3,4,5} \
-  --preset rerank_cut05 \
-  --run-cut 0.5
-```
-
-`--run-cut`은 실제 실행에 사용한 cutoff와 일치해야 한다. Gate에 걸린 질문은 answer node에
-도달하지 않았으므로 더 낮은 cutoff는 재구성할 수 없다. 누락된 판정을 기권으로 처리하면 낮은
-cutoff가 실제보다 안전해 보인다. Insufficient 질문과 answerable 질문의 tradeoff가 반대이므로
-sweep은 모든 category를 대상으로 실행한다.
-
-검색층 facet coverage를 측정한다.
-
-```bash
 python -m evals.facet_coverage label --runs results/rep{1,2,3,4,5}
-python -m evals.facet_gold_review --runs results/rep{1,2,3,4,5}
-python -m evals.facet_coverage score \
-  --runs results/rep{1,2,3,4,5} \
-  --a <A> \
-  --b <B>
+python -m evals.facet_gold_review  --runs results/rep{1,2,3,4,5}
+python -m evals.facet_coverage score --runs results/rep{1,2,3,4,5} --a <A> --b <B>
 ```
 
-`facet_gold_review`는 metric의 단조성을 이용해 사람 검수 범위를 줄인다. Supporting chunk를
-추가하면 “not retrieved”가 “retrieved”로만 바뀔 수 있으므로, 모든 관측에서 retrieved인
-key point는 비교에 영향을 주지 않는다. 이 원리로 검수 대상을 33개 key point에서 11개로
-줄였다.
-
-같은 출력에 대해 judge를 반복 실행한다.
-
-```bash
-mkdir -p results/judge2/rep1
-for f in results/rep1/*.jsonl; do
-  case "$f" in
-    *.judged.jsonl) ;;
-    *) cp "$f" results/judge2/rep1/ ;;
-  esac
-done
-python -m evals.judge --results results/judge2/rep1
-```
-
-Rerank 실험은 concurrency 1을 사용한다. 요청 1회에 약 57개 후보와 11k input token이
-포함되며, concurrency 2에서는 36문항 실행 중 10건이 실패했다. 측정 환경에서 complex
-12문항, 2개 구성, 5회 반복 비교에는 약 11분이 걸린다.
-
-## 기술 스택
-
-Python 3.12+ · FastAPI · LangGraph 1.x · LangChain 1.x · PostgreSQL · pgvector ·
-pg_trgm · Pydantic 2 · OpenAI models · pytest
+- `--run-cut`은 실행에 실제로 쓴 cutoff와 같아야 하고, 그 cutoff는 재구성하려는 범위보다 낮아야 한다.
+  더 낮은 cutoff는 재구성할 수 없다 — 게이트에 걸린 질문은 답변 노드에 닿지 못했고, 그 판정을
+  기권으로 세면 낮은 cutoff가 인위적으로 안전해 보인다. sweep은 모든 범주에서 돌린다: 근거 부족
+  질문과 답변 가능 질문의 트레이드오프가 반대 방향이다.
+- `facet_gold_review`는 지표의 단조성을 이용한다 — 근거 청크가 늘면 「미검색」이 「검색」으로만 바뀔
+  수 있다. 덕분에 사람이 볼 대상이 33개 key point에서 11개로 줄었다.
+- 리랭크 실험은 동시성 1로 돈다. 한 요청이 후보 약 57개·입력 약 11k 토큰이고, 동시성 2에서는
+  36문항 실행에 실패 10건이 났다.
 
 ## CureAgent와의 관계
 
-- [cure-agent-be](https://github.com/Cure-Agent/cure-agent-be)는 운영 서비스이며 CureAgent의
-  architecture와 검색 정책에 대한 source of truth다.
-- 이 저장소는 실험 및 LLM evaluation harness다. 운영 검색 경로를 이식하고 제안된 변경을
-  테스트하며, 근거가 뒷받침하는 개입만 제품에 반영한다. 현재 근거에서는 운영 경로를
-  변경하지 않는다.
-- [cure-agent-fe](https://github.com/Cure-Agent/cure-agent-fe)는 streaming 답변, citation,
-  환자 workflow, 대화 history를 제공하는 product-facing interface다.
+CureAgent는 **단일 스펙 저장소 + 세 구현 레포**다.
+
+- [cure-agent-be](https://github.com/Cure-Agent/cure-agent-be) — 운영 서버이고 `docs/specs/`가 사는
+  곳이며, architecture와 검색 정책의 source of truth다. 이 서비스의 이미지도 BE가 배포한다.
+- [cure-agent-fe](https://github.com/Cure-Agent/cure-agent-fe) — 스트리밍 답변, 인용, 환자 워크플로,
+  대화 이력을 제공하는 제품 화면이다.
+- **이 저장소** — 에이전트 서비스와, 그것이 자라 나온 실험·LLM 평가 하네스다.
+
+스펙은 BE 레포에 있다. 이 레포는 수용 기준 중 `(AGENT)` 라벨이 달린 것을 구현하고 스펙을 직접 쓰지
+않는다. `scripts/fetch_spec.py`가 번호로 스펙을 조달하고, 절차(테스트 동결, `/implement`와
+`/problem` 라우팅, 머지)는 `automation/`에 있으며 `.claude/commands/`·`.codex/skills/`는 하네스
+특성만 주입하는 어댑터다.
 
 ## 저장소 구조
 
 ```text
-app/
-  agent/graph.py                         # Graph 배선, routing, PRESETS
-  agent/nodes/                           # Type이 있는 LLM 경계 node
-  agent/nodes/answerer.py                # 답변 생성과 answerability gate
-  agent/state.py                         # AgentState와 structured output schema
-  retrieval/hybrid.py                    # Dense + lexical retrieval SQL
-  retrieval/rrf.py                       # Test로 동작을 고정한 RRF fusion
-  retrieval/reranker.py                  # 이식한 listwise reranker
-  retrieval/reranking_retriever.py       # 변형 A: 각 하위 질의를 rerank
-  retrieval/fused_reranking_retriever.py # 변형 B: 병합한 뒤 한 번 rerank
-  retrieval/factory.py                   # Retrieval 경로 구성
-  llm/prompts.py                         # Node prompt와 facet 변형
-  api/routes.py                          # POST /ask와 /ask/stream (SSE)
+app/service/                             # 서비스 — 운영 이미지에 싣는 유일한 코드
+  main.py                                # create_app · lifespan(추적 스위치 · BE 클라이언트 · 턴 설정)
+  routes.py                              # healthz · me · POST …/messages/stream
+  turn.py                                # 턴 하나: 분류 → 경로 실행 → 완결 · 하트비트 · 끊김 정리
+  routing.py                             # 분류기(strict JSON) · 실행 경로 표(순수) · 검색 입력의 라벨 제거
+  synthesis.py                           # 환자·복합 합성 · 판정 선행 증분 파서 · 마커 → 인용
+  backend.py                             # BE 클라이언트 — 받은 자격만 싣는다, 무응답 → 502
+  access_token.py                        # access JWT 잔여 수명 선검사(exp·iat, 서명은 검증하지 않는다)
+  sse.py · envelope.py · config.py       # SSE 프레임 · §10.1 봉투 + ULID traceId · 환경변수만 읽는 설정
+  llm.py · tracing.py                    # BaseChatModel 뒤의 채팅 모델 · LangSmith 스위치 + 숨김 클라이언트
+app/                                     # 연구 — 실험 앱, 이미지에 싣지 않는다
+  main.py · api/routes.py                # 실험 앱: /healthz · POST /ask · /ask/stream
+  agent/graph.py · agent/state.py        # AgentConfig · PRESETS · 순수 라우팅 함수 · 노드 입출력 스키마
+  agent/nodes/                           # decompose · retrieve · evaluate · generate_queries · answer · abstain
+  retrieval/hybrid.py · rrf.py           # dense(pgvector) + lexical(pg_trgm) SQL · RRF 융합, K=60, 무절단
+  retrieval/reranker.py                  # 이식한 listwise 리랭커
+  retrieval/reranking_retriever.py       # 변형 A: 하위 질의마다 리랭크
+  retrieval/fused_reranking_retriever.py # 변형 B: 병합 후 1회 리랭크
+  retrieval/factory.py                   # 검색 경로 조립 — API와 evals가 같은 배선을 쓰는 단일 지점
+  config.py · llm/prompts.py             # 실험 설정, policy_version_for · 노드 프롬프트와 축 변형
 evals/
+  run_routing.py · routing/              # 실행 경로 정확도 · 경계 문항 · 데모 질의문 · 229문항 평가셋
+  run_synthesis.py · synthesis/          # 합성 심판 · 환자 기록 · 환자 질문 · 복합 문항
+  run_eval.py · judge.py · metrics.py    # 커밋 메타데이터를 남기는 ablation 러너 · LLM 심판 + 결정적 규칙
+  repeat_metrics.py · cut_sweep.py       # 반복 짝 지표와 부트스트랩 CI · 사후 cutoff sweep
+  facet_coverage.py · facet_gold*.json   # 검색층 key point 커버리지 · 근거 청크 라벨
   dataset.jsonl                          # 36문항 평가셋
-  run_eval.py                            # Commit metadata를 기록하는 ablation runner
-  judge.py                               # LLM-as-judge와 결정적 규칙
-  metrics.py                             # 단일 실행의 preset/category metric
-  repeat_metrics.py                      # 반복 paired metric과 bootstrap CI
-  facet_coverage.py                      # 검색층 key-point coverage
-  facet_gold_review.py                   # 최소 근거 label 검수 집합
-  cut_sweep.py                           # 사후 rerank cutoff sweep
-  facet_gold.json                        # Supporting-chunk label
+tests/                                   # 오프라인 단위 테스트(서비스·그래프·라우팅·RRF·리랭크·심판·추적)
+tests/e2e/                               # 컨테이너 테스트 — 이미지를 빌드해 띄운다, Docker에 못 닿으면 실패
+scripts/                                 # smoke_llm.py · fetch_spec.py · verify_public_results.py
+docs/architecture.md                     # 이 저장소의 설계 문서
 docs/experiments/                        # 불변 실험 기록과 판정
-  evidence/paired_scores.csv             # 공개 익명 binary score
-scripts/verify_public_results.py         # 공개 effect, CI, sign test 재계산
-tests/                                   # Offline graph, routing, RRF, rerank, judge,
-                                         # control integrity test
+automation/ · .claude/ · .codex/         # SDD 하네스: 절차 원문 + 하네스별 어댑터
+Dockerfile · Makefile · uv.lock          # 서비스 이미지 · 검증 명령 · 의존성 잠금
 ```
+
+## 기술 스택
+
+Python 3.12+ · FastAPI · Starlette SSE · httpx · LangChain 1.x · LangSmith ·
+prometheus-client · Pydantic 2 · OpenAI models · uv · Docker · pytest · pyright · ruff
+
+연구 경로는 여기에 LangGraph 1.x · PostgreSQL · pgvector · pg_trgm을 더 쓴다. 서비스 경로는 그중
+아무것도 쓰지 않는다 — DB 풀을 열지 않고 실험 코드를 import하지 않는다.
