@@ -1,6 +1,6 @@
 # Medical Agentic RAG
 
-[English](README.md) | [한국어](README.ko.md)
+**English** · [한국어](README.ko.md)
 
 > **CureAgent's agent service.** It classifies one clinician question, executes the
 > matching path through the backend's internal APIs, and streams the result to the

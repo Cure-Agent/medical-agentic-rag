@@ -1,6 +1,6 @@
 # Medical Agentic RAG
 
-[English](README.md) | [한국어](README.ko.md)
+[English](README.md) · **한국어**
 
 > **CureAgent의 에이전트 서비스.** 의료인이 보낸 질문 하나를 분류해 맞는 경로를 BE 내부 API로
 > 실행하고, 결과를 SSE로 브라우저에 흘린다.
