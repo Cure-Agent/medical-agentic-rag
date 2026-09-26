@@ -230,7 +230,9 @@ These runs call real models and write to the gitignored `results/`.
 
 Scores are not quoted here: `results/` is gitignored and overwritten, and the synthesis
 judge has a measured false-positive rate high enough that its output needs review before
-use.
+use. A run worth keeping is fixed as a dated record instead — the routing run on the
+boundary set, scored on both the raw verdict and the executed path, is in
+[docs/experiments/2026-09-14-routing-boundary.md](docs/experiments/2026-09-14-routing-boundary.md).
 
 ## Origins: the Agentic RAG Ablation Study
 
