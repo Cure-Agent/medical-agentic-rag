@@ -201,7 +201,9 @@ LangSmith는 환경변수 조회를 캐시하고 `configure`가 프로세스 전
   복합 문항 40개(그중 8건은 기권해야 한다)가 있다. 생성은 서비스 함수를 그대로 쓴다.
 
 수치는 이 문서에 적지 않는다 — `results/`는 gitignore이고 덮어쓰며, 합성 심판의 거짓 양성이
-그대로 믿기에는 많다(쓰기 전에 사람이 본다).
+그대로 믿기에는 많다(쓰기 전에 사람이 본다). 남길 실행은 날짜를 박은 기록으로 고정한다 — 경계 문항
+라우팅 실행을 원문 판정과 실행 경로 두 기준으로 채점한 결과는
+[docs/experiments/2026-09-14-routing-boundary.md](docs/experiments/2026-09-14-routing-boundary.md)에 있다.
 
 ## 기원: Agentic RAG ablation 연구
 
