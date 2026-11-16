@@ -5,9 +5,10 @@ on:
     branches: [main]
   pull_request:
 
-# PR은 최신 push만 검증한다 — main push는 머지된 커밋의 검증 기록이 남아야 하므로 취소하지 않는다
+# PR은 최신 push만 검증한다(그룹 = PR ref) — main push는 머지된 커밋의 검증 기록이 남아야 하므로 취소하지 않고
+# 커밋마다 그룹을 따로 둔다(그룹 = 커밋 SHA). 그룹이 같으면 대기 런이 하나만 남아서, 머지가 몰리면 앞 커밋의 대기 런이 cancelled로 끝난다
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # 잡 이름 = Makefile 타깃. 로컬 선검증(automation/ship.md Phase 2)과 같은 명령을 돈다.
